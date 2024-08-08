@@ -119,9 +119,7 @@ VkPipeline PipelineBuilder::buildPipeline(VkDevice device)
     graphicsPipelineCreateInfo.pDynamicState = &dynamicInfo;
 
     VkPipeline newPipeline;
-    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo,
-        nullptr, &newPipeline)
-        != VK_SUCCESS) {
+    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo, nullptr, &newPipeline) != VK_SUCCESS) {
         fmt::println("failed to create pipeline");
         return VK_NULL_HANDLE; // failed to create graphics pipeline
     }

@@ -125,6 +125,7 @@ public:
 	//draw loop
 	void draw();
 
+	void drawGeometry(VkCommandBuffer* commandBuffer);
 	void drawBackground(VkCommandBuffer* commandBuffer);
 	void drawImgui(VkCommandBuffer* commandBuffer,  VkImageView targetImageView);
 

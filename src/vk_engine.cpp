@@ -30,6 +30,7 @@ constexpr bool bUseValidationLayers = true;
 using namespace std;
 
 
+
 void VulkanEngine::init()
 {
 	SDL_Init(SDL_INIT_VIDEO);
@@ -62,6 +63,7 @@ void VulkanEngine::init()
 	//everything went fine
 	_isInitialized = true;
 }
+
 void VulkanEngine::cleanup()
 {
 	if (_isInitialized) {
@@ -90,29 +92,6 @@ void VulkanEngine::cleanup()
 
 		SDL_DestroyWindow(_window);
 	}
-}
-void VulkanEngine::drawBackground(VkCommandBuffer* commandBuffer)
-{
-	ComputeEffect& effect = backgroundEffects[currentBackgroundEffect];
-
-	vkCmdBindPipeline(*commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, effect.pipeline);
-
-	vkCmdBindDescriptorSets(*commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _gradientPipelineLayout, 0, 1, &_drawImageDescriptors, 0, nullptr);
-
-	vkCmdPushConstants(*commandBuffer, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &effect.data);
-	vkCmdDispatch(*commandBuffer, (uint32_t)std::ceil(_drawExtent.width / 16.0), (uint32_t)std::ceil(_drawExtent.height / 16.0), 1);
-}
-
-void VulkanEngine::drawImgui(VkCommandBuffer* commandBuffer, VkImageView targetImageView)
-{
-	VkRenderingAttachmentInfo colorAttachment = vkinit::RenderingAttachmentInfo(targetImageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-	VkRenderingInfo renderInfo = vkinit::RenderingInfo(_swapchainExtent, &colorAttachment, nullptr);
-
-	vkCmdBeginRendering(*commandBuffer, &renderInfo);
-
-	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), *commandBuffer);
-
-	vkCmdEndRendering(*commandBuffer);
 }
 
 void VulkanEngine::draw()
@@ -146,7 +125,12 @@ void VulkanEngine::draw()
 
 	drawBackground(&currentFrame->_mainCommandBuffer);
 
-	vkutil::transitionImage(&currentFrame->_mainCommandBuffer, &_drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+	vkutil::transitionImage(&currentFrame->_mainCommandBuffer, &_drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+	drawGeometry(&currentFrame->_mainCommandBuffer);
+
+
+	vkutil::transitionImage(&currentFrame->_mainCommandBuffer, &_drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 	vkutil::transitionImage(&currentFrame->_mainCommandBuffer, &_swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 	vkutil::copyImageToImage(&currentFrame->_mainCommandBuffer, _drawImage.image, &_swapchainImages[swapchainImageIndex], _drawExtent, _swapchainExtent);
 
@@ -247,6 +231,67 @@ void VulkanEngine::run()
 		draw();
 	}
 }
+
+
+
+void VulkanEngine::drawBackground(VkCommandBuffer* commandBuffer)
+{
+	ComputeEffect& effect = backgroundEffects[currentBackgroundEffect];
+
+	vkCmdBindPipeline(*commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, effect.pipeline);
+
+	vkCmdBindDescriptorSets(*commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, _gradientPipelineLayout, 0, 1, &_drawImageDescriptors, 0, nullptr);
+
+	vkCmdPushConstants(*commandBuffer, _gradientPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ComputePushConstants), &effect.data);
+	vkCmdDispatch(*commandBuffer, (uint32_t)std::ceil(_drawExtent.width / 16.0), (uint32_t)std::ceil(_drawExtent.height / 16.0), 1);
+}
+
+void VulkanEngine::drawGeometry(VkCommandBuffer* commandBuffer) {
+	//begin a render pass  connected to our draw image
+	VkRenderingAttachmentInfo colorAttachment = vkinit::RenderingAttachmentInfo(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+
+	VkRenderingInfo renderInfo = vkinit::RenderingInfo(_drawExtent, &colorAttachment, nullptr);
+	vkCmdBeginRendering(*commandBuffer, &renderInfo);
+
+	vkCmdBindPipeline(*commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, _trianglePipeline);
+
+	//set dynamic viewport and scissor
+	VkViewport viewport = {};
+	viewport.x = 0;
+	viewport.y = 0;
+	viewport.width = _drawExtent.width;
+	viewport.height = _drawExtent.height;
+	viewport.minDepth = 0.f;
+	viewport.maxDepth = 1.f;
+
+	vkCmdSetViewport(*commandBuffer, 0, 1, &viewport);
+
+	VkRect2D scissor = {};
+	scissor.offset.x = 0;
+	scissor.offset.y = 0;
+	scissor.extent.width = _drawExtent.width;
+	scissor.extent.height = _drawExtent.height;
+
+	vkCmdSetScissor(*commandBuffer, 0, 1, &scissor);
+
+	//launch a draw command to draw 3 vertices
+	vkCmdDraw(*commandBuffer, 3, 1, 0, 0);
+
+	vkCmdEndRendering(*commandBuffer);
+}
+
+void VulkanEngine::drawImgui(VkCommandBuffer* commandBuffer, VkImageView targetImageView)
+{
+	VkRenderingAttachmentInfo colorAttachment = vkinit::RenderingAttachmentInfo(targetImageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	VkRenderingInfo renderInfo = vkinit::RenderingInfo(_swapchainExtent, &colorAttachment, nullptr);
+
+	vkCmdBeginRendering(*commandBuffer, &renderInfo);
+
+	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), *commandBuffer);
+
+	vkCmdEndRendering(*commandBuffer);
+}
+
 
 
 
@@ -665,7 +710,7 @@ void VulkanEngine::initTrianglePipeline() {
 	VK_CHECK(vkCreatePipelineLayout(_device, &pipeline_layout_info, nullptr, &_trianglePipelineLayout));
 
 	VkShaderModule triangleFragShader;
-	if (!vkutil::loadShaderModule("../../shaders/colored_triangle.frag.spv", _device, &triangleFragShader)) {
+	if (!vkutil::loadShaderModule("../../shaders/coloured_triangle.frag.spv", _device, &triangleFragShader)) {
 		fmt::print("Error when building the triangle fragment shader module");
 	}
 	else {
@@ -673,7 +718,7 @@ void VulkanEngine::initTrianglePipeline() {
 	}
 
 	VkShaderModule triangleVertexShader;
-	if (!vkutil::loadShaderModule("../../shaders/colored_triangle.vert.spv", _device, &triangleVertexShader)) {
+	if (!vkutil::loadShaderModule("../../shaders/coloured_triangle.vert.spv", _device, &triangleVertexShader)) {
 		fmt::print("Error when building the triangle vertex shader module");
 	}
 	else {
@@ -715,6 +760,8 @@ void VulkanEngine::initTrianglePipeline() {
 		vkDestroyPipeline(_device, _trianglePipeline, nullptr);
 		});
 }
+
+
 
 void VulkanEngine::immediateSubmit(std::function<void(VkCommandBuffer* commandBuffer)>&& function)
 {
