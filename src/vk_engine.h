@@ -93,6 +93,11 @@ public:
 	VkPipelineLayout _trianglePipelineLayout;
 	VkPipeline _trianglePipeline;
 
+	VkPipelineLayout _meshPipelineLayout;
+	VkPipeline _meshPipeline;
+
+	GPUMeshBuffers rectangle;
+
 	std::vector<VkFramebuffer> _framebuffers;
 	std::vector<VkImage> _swapchainImages;
 	std::vector<VkImageView> _swapchainImageViews;
@@ -143,9 +148,16 @@ private:
 	void initDescriptors();
 	void initSyncStructures();
 	void initImgui();
+	void initDefaultData();
+	void initBackgroundPipelines();
 	void initTrianglePipeline();
+	void initMeshPipeline();
 
 	void rebuildSwapchain();
 	void createSwapchain(uint32_t width, uint32_t height);
 	void destroySwapchain();
+
+	AllocatedBuffer createBuffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+	void destroyBuffer(const AllocatedBuffer& buffer);
+	GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
 };
