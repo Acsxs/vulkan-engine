@@ -93,15 +93,10 @@ public:
 	std::vector<ComputeEffect> backgroundEffects;
 	int currentBackgroundEffect{ 0 };
 
-	VkPipelineLayout _trianglePipelineLayout;
-	VkPipeline _trianglePipeline;
-
 	VkPipelineLayout _meshPipelineLayout;
 	VkPipeline _meshPipeline;
 
 	std::vector<std::shared_ptr<MeshAsset>> testMeshes;
-
-	GPUMeshBuffers rectangle;
 
 	std::vector<VkFramebuffer> _framebuffers;
 	std::vector<VkImage> _swapchainImages;
@@ -154,7 +149,6 @@ private:
 	void initImgui();
 	void initDefaultData();
 	void initBackgroundPipelines();
-	void initTrianglePipeline();
 	void initMeshPipeline();
 
 	void rebuildSwapchain();
