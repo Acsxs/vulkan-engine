@@ -7,7 +7,57 @@
 #include <vk_descriptors.h>
 #include <vk_loader.h>
 
+struct GLTFMetallicRoughness {
+	MaterialPipeline opaquePipeline;
+	MaterialPipeline transparentPipeline;
 
+	VkDescriptorSetLayout materialLayout;
+
+	struct MaterialConstants {
+		glm::vec4 colorFactors;
+		glm::vec4 metallicRoughnessFactors;
+		//padding, we need it anyway for uniform buffers
+		glm::vec4 extra[14];
+	};
+
+	struct MaterialResources {
+		AllocatedImage colorImage;
+		VkSampler colorSampler;
+		AllocatedImage metalRoughImage;
+		VkSampler metalRoughSampler;
+		VkBuffer dataBuffer;
+		uint32_t dataBufferOffset;
+	};
+
+	DescriptorWriter writer;
+
+	void buildPipelines(VulkanEngine* engine);
+	void clearResources(VkDevice device);
+
+	MaterialInstance writeMaterial(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
+};
+
+struct MeshNode : public Node {
+
+	std::shared_ptr<MeshAsset> mesh;
+
+	virtual void draw(const glm::mat4& topMatrix, DrawContext& ctx) override;
+};
+
+struct RenderObject {
+	uint32_t indexCount;
+	uint32_t firstIndex;
+	VkBuffer indexBuffer;
+
+	MaterialInstance* material;
+
+	glm::mat4 transform;
+	VkDeviceAddress vertexBufferAddress;
+};
+
+struct DrawContext {
+	std::vector<RenderObject> OpaqueSurfaces;
+};
 
 struct DeletionQueue
 {
@@ -35,6 +85,7 @@ struct FrameData {
 	VkCommandBuffer _mainCommandBuffer;
 
 	DeletionQueue _deletionQueue;
+	DescriptorAllocatorGrowable _frameDescriptors;
 };
 
 constexpr unsigned int FRAMES_IN_FLIGHT = 2;
@@ -77,6 +128,11 @@ public:
 	FrameData& getCurrentFrame() { return _frames[_frameNumber % FRAMES_IN_FLIGHT]; };
 
 
+
+	DrawContext mainDrawContext;
+	std::unordered_map<std::string, std::shared_ptr<Node>> loadedNodes;
+
+
 	VkQueue _graphicsQueue;
 	uint32_t _graphicsQueueFamily;	
 
@@ -86,7 +142,7 @@ public:
 	VkExtent2D _swapchainExtent;
 	VkExtent2D _drawExtent;
 	
-	DescriptorAllocator globalDescriptorAllocator;
+	DescriptorAllocatorGrowable globalDescriptorAllocator;
 
 	VkPipeline _gradientPipeline;
 	VkPipelineLayout _gradientPipelineLayout;
@@ -95,6 +151,9 @@ public:
 
 	VkPipelineLayout _meshPipelineLayout;
 	VkPipeline _meshPipeline;
+
+	GPUSceneData sceneData;
+	VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
 
 	std::vector<std::shared_ptr<MeshAsset>> testMeshes;
 
@@ -117,6 +176,18 @@ public:
 	VkCommandBuffer _immCommandBuffer;
 	VkCommandPool _immCommandPool;
 
+	VkDescriptorSetLayout _singleImageDescriptorLayout;
+
+	AllocatedImage _whiteImage;
+	AllocatedImage _blackImage;
+	AllocatedImage _greyImage;
+	AllocatedImage _errorCheckerboardImage;
+
+	VkSampler _defaultSamplerLinear;
+	VkSampler _defaultSamplerNearest;
+
+	MaterialInstance defaultData;
+	GLTFMetallicRoughness metalRoughMaterial;
 
 
 	VulkanEngine& Get();
@@ -131,12 +202,18 @@ public:
 	void drawBackground(VkCommandBuffer* commandBuffer);
 	void drawImgui(VkCommandBuffer* commandBuffer,  VkImageView targetImageView);
 
+	void updateScene();
+
 	void run();
 
 	void immediateSubmit(std::function<void(VkCommandBuffer* commandBuffer)>&& function);
 	AllocatedBuffer createBuffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
 	void destroyBuffer(const AllocatedBuffer& buffer);
 	GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
+
+	AllocatedImage createImage(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
+	AllocatedImage createImage(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
+	void destroyImage(const AllocatedImage& img);
 
 private:
 

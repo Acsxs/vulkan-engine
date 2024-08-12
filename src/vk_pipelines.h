@@ -36,12 +36,12 @@ public:
     void setMultisamplingNone();
 
     void disableBlending();
+    void enableBlendingAdditive();
+    void enableBlendingAlphaBlend();
 
     void setColorAttachmentFormat(VkFormat format);
-
     void setDepthFormat(VkFormat format);
     
     void disableDepthtest();
-
     void enableDepthtest(bool depthWriteEnable, VkCompareOp op);
 };

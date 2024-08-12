@@ -45,7 +45,7 @@ std::optional<std::vector<std::shared_ptr<MeshAsset>>> loadGLTFMeshes(VulkanEngi
         indices.clear();
         vertices.clear();
 
-        for (fastgltf::Primitive& primitive : mesh.primitives) {
+        for (auto&& primitive : mesh.primitives) {
             GeoSurface newSurface;
             newSurface.startIndex = (uint32_t)indices.size();
             newSurface.count = (uint32_t)gltf.accessors[primitive.indicesAccessor.value()].count;
