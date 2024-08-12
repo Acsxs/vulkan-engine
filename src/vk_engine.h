@@ -5,6 +5,7 @@
 
 #include <vk_types.h>
 #include <vk_descriptors.h>
+#include <vk_loader.h>
 
 
 
@@ -89,12 +90,16 @@ public:
 
 	VkPipeline _gradientPipeline;
 	VkPipelineLayout _gradientPipelineLayout;
+	std::vector<ComputeEffect> backgroundEffects;
+	int currentBackgroundEffect{ 0 };
 
 	VkPipelineLayout _trianglePipelineLayout;
 	VkPipeline _trianglePipeline;
 
 	VkPipelineLayout _meshPipelineLayout;
 	VkPipeline _meshPipeline;
+
+	std::vector<std::shared_ptr<MeshAsset>> testMeshes;
 
 	GPUMeshBuffers rectangle;
 
@@ -104,40 +109,39 @@ public:
 
 	VkDescriptorSet _drawImageDescriptors;
 	VkDescriptorSetLayout _drawImageDescriptorLayout;
+	AllocatedImage _drawImage;
+
+	AllocatedImage _depthImage;
 
 	DeletionQueue _mainDeletionQueue;
 
 	VmaAllocator _allocator; //vma lib allocator
+
 	// immediate submit structures
 	VkFence _immFence;
 	VkCommandBuffer _immCommandBuffer;
 	VkCommandPool _immCommandPool;
 
-	//draw resources
-	AllocatedImage _drawImage;
 
-	std::vector<ComputeEffect> backgroundEffects;
 
-	int currentBackgroundEffect{ 0 };
-	//initializes everything in the engine
 	VulkanEngine& Get();
 	
 	void init();
 
-	//shuts down the engine
 	void cleanup();
 
-	//draw loop
 	void draw();
 
 	void drawGeometry(VkCommandBuffer* commandBuffer);
 	void drawBackground(VkCommandBuffer* commandBuffer);
 	void drawImgui(VkCommandBuffer* commandBuffer,  VkImageView targetImageView);
 
-	//run main loop
 	void run();
 
 	void immediateSubmit(std::function<void(VkCommandBuffer* commandBuffer)>&& function);
+	AllocatedBuffer createBuffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+	void destroyBuffer(const AllocatedBuffer& buffer);
+	GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
 
 private:
 
@@ -156,8 +160,4 @@ private:
 	void rebuildSwapchain();
 	void createSwapchain(uint32_t width, uint32_t height);
 	void destroySwapchain();
-
-	AllocatedBuffer createBuffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
-	void destroyBuffer(const AllocatedBuffer& buffer);
-	GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
 };
