@@ -6,6 +6,8 @@
 #include <vk_types.h>
 #include <vk_descriptors.h>
 #include <vk_loader.h>
+#include <camera.h>
+
 
 struct GLTFMetallicRoughness {
 	MaterialPipeline opaquePipeline;
@@ -114,7 +116,7 @@ public:
 	bool _isInitialized{ false };
 	int _frameNumber {0};
 	bool stop_rendering{false};
-	VkExtent2D _windowExtent{ 1700 , 900 };
+	VkExtent2D _windowExtent{ 1920 , 1080 };
 
 	struct SDL_Window* _window{ nullptr };
 
@@ -141,7 +143,7 @@ public:
 	VkFormat _swapchainImageFormat;
 	VkExtent2D _swapchainExtent;
 	VkExtent2D _drawExtent;
-	
+
 	DescriptorAllocatorGrowable globalDescriptorAllocator;
 
 	VkPipeline _gradientPipeline;
@@ -149,8 +151,8 @@ public:
 	std::vector<ComputeEffect> backgroundEffects;
 	int currentBackgroundEffect{ 0 };
 
-	VkPipelineLayout _meshPipelineLayout;
-	VkPipeline _meshPipeline;
+	//VkPipelineLayout _meshPipelineLayout;
+	//VkPipeline _meshPipeline;
 
 	GPUSceneData sceneData;
 	VkDescriptorSetLayout _gpuSceneDataDescriptorLayout;
@@ -189,6 +191,7 @@ public:
 	MaterialInstance defaultData;
 	GLTFMetallicRoughness metalRoughMaterial;
 
+	Camera mainCamera;
 
 	VulkanEngine& Get();
 	
@@ -226,7 +229,7 @@ private:
 	void initImgui();
 	void initDefaultData();
 	void initBackgroundPipelines();
-	void initMeshPipeline();
+	//void initMeshPipeline();
 
 	void rebuildSwapchain();
 	void createSwapchain(uint32_t width, uint32_t height);

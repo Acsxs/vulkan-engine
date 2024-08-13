@@ -48,6 +48,9 @@ void VulkanEngine::init()
 		window_flags
 	);
 
+	SDL_SetRelativeMouseMode(SDL_TRUE);
+	mainCamera.relMouse = true;
+
 	initVulkan();
 	initSwapchain();
 	initCommands();
@@ -56,6 +59,12 @@ void VulkanEngine::init()
 	initPipelines();
 	initImgui();
 	initDefaultData();
+
+	mainCamera.velocity = glm::vec3(0.f);
+	mainCamera.position = glm::vec3(0, 0, 5);
+
+	mainCamera.pitch = 0;
+	mainCamera.yaw = 0;
 
 	//everything went fine
 	_isInitialized = true;
@@ -198,7 +207,18 @@ void VulkanEngine::run()
 					stop_rendering = false;
 				}
 			}
+			if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
+				if (mainCamera.relMouse == false) {
+					SDL_SetRelativeMouseMode(SDL_TRUE);
+					mainCamera.relMouse = true;
+				}
+				else if (mainCamera.relMouse == true) {
+					SDL_SetRelativeMouseMode(SDL_FALSE);
+					mainCamera.relMouse = false;
+				}
+			}
 
+			mainCamera.processSDLEvent(e);
 			//send SDL event to imgui for handling
 			ImGui_ImplSDL2_ProcessEvent(&e);
 		}
@@ -214,7 +234,7 @@ void VulkanEngine::run()
 		ImGui_ImplVulkan_NewFrame();
 		ImGui_ImplSDL2_NewFrame();
 
-		//> imgui_bk
+		// imgui background
 		ImGui::NewFrame();
 
 		if (ImGui::Begin("background")) {
@@ -234,7 +254,18 @@ void VulkanEngine::run()
 		}
 		ImGui::Render();
 
-		//< imgui_bk
+		//// imgui input sensitivity
+		//ImGui::NewFrame();
+
+		//if (ImGui::Begin("input sensitivity")) {
+
+
+		//	ImGui::SliderFloat("movespeed", &mainCamera.moveSpeed, 0, 2);
+		//	ImGui::SliderFloat("mouse sense", &mainCamera.mouseSense, 0, 2);
+
+		//	ImGui::End();
+		//}
+		//ImGui::Render();
 
 		draw();
 	}
@@ -262,7 +293,7 @@ void VulkanEngine::drawGeometry(VkCommandBuffer* commandBuffer) {
 	//add it to the deletion queue of this frame so it gets deleted once its been used
 	getCurrentFrame()._deletionQueue.pushFunction([=, this]() {
 		destroyBuffer(gpuSceneDataBuffer);
-		});
+	});
 
 	//write the buffer
 	GPUSceneData* sceneUniformData = (GPUSceneData*)gpuSceneDataBuffer.allocation->GetMappedData();
@@ -272,7 +303,7 @@ void VulkanEngine::drawGeometry(VkCommandBuffer* commandBuffer) {
 	VkDescriptorSet globalDescriptor = getCurrentFrame()._frameDescriptors.allocate(_device, _gpuSceneDataDescriptorLayout);
 
 	DescriptorWriter writer;
-	writer.writeBuffer(0, gpuSceneDataBuffer.buffer, sizeof(GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+	writer.writeBuffer(0, gpuSceneDataBuffer.buffer, sizeof(GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER); // something makes bind 0 a sampler, find it
 	writer.updateSet(_device, globalDescriptor);
 
 	//begin a render pass  connected to our draw image
@@ -282,12 +313,30 @@ void VulkanEngine::drawGeometry(VkCommandBuffer* commandBuffer) {
 
 	VkRenderingInfo renderInfo = vkinit::RenderingInfo(_drawExtent, &colorAttachment, &depthAttachment);
 
+	VkViewport viewport = {};
+	viewport.x = 0;
+	viewport.y = 0;
+	viewport.width = _drawExtent.width;
+	viewport.height = _drawExtent.height;
+	viewport.minDepth = 0.f;
+	viewport.maxDepth = 1.f;
+
+
+	VkRect2D scissor = {};
+	scissor.offset.x = 0;
+	scissor.offset.y = 0;
+	scissor.extent.width = _drawExtent.width;
+	scissor.extent.height = _drawExtent.height;
+
 	vkCmdBeginRendering(*commandBuffer, &renderInfo);
 	for (const RenderObject& draw : mainDrawContext.OpaqueSurfaces) {
 
 		vkCmdBindPipeline(*commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->pipeline);
 		vkCmdBindDescriptorSets(*commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 0, 1, &globalDescriptor, 0, nullptr);
 		vkCmdBindDescriptorSets(*commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
+
+		vkCmdSetViewport(*commandBuffer, 0, 1, &viewport);
+		vkCmdSetScissor(*commandBuffer, 0, 1, &scissor);
 
 		vkCmdBindIndexBuffer(*commandBuffer, draw.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
@@ -322,19 +371,33 @@ void VulkanEngine::updateScene()
 
 	loadedNodes["Suzanne"]->draw(glm::mat4{ 1.f }, mainDrawContext);
 
-	sceneData.view = glm::translate(glm::vec3{ 2,0,-5 });
+	mainCamera.update();
+
+	glm::mat4 view = mainCamera.getViewMatrix();
+
 	// camera projection
-	sceneData.proj = glm::perspective(glm::radians(90.f), (float)_windowExtent.width / (float)_windowExtent.height, 10000.f, 0.1f);
+	glm::mat4 projection = glm::perspective(glm::radians(70.f), (float)_windowExtent.width / (float)_windowExtent.height, 10000.f, 0.1f);
 
 	// invert the Y direction on projection matrix so that we are more similar
 	// to opengl and gltf axis
-	sceneData.proj[1][1] *= -1;
-	sceneData.viewproj = sceneData.proj * sceneData.view;
+	projection[1][1] *= -1;
+
+	sceneData.view = view;
+	sceneData.proj = projection;
+	sceneData.viewproj = projection * view;
 
 	//some default lighting parameters
-	sceneData.ambientColor = glm::vec4(.1f);
-	sceneData.sunlightColor = glm::vec4(1.f);
-	sceneData.sunlightDirection = glm::vec4(0, 1, 0.5, 1.f);
+	sceneData.ambientColor = glm::vec4(.1f,.1f,.1f,1.f);
+	sceneData.sunlightColor = glm::vec4(1.f,1.f,1.f,1.f);
+	sceneData.sunlightDirection = glm::vec4(0, 1, 0.5, 10.f);
+
+	for (int x = -3; x < 3; x++) {
+
+		glm::mat4 scale = glm::scale(glm::vec3{ 0.2 });
+		glm::mat4 translation = glm::translate(glm::vec3{ x, 1, 0 });
+
+		loadedNodes["Cube"]->draw(translation * scale, mainDrawContext);
+	}
 }
 
 
@@ -748,7 +811,7 @@ void VulkanEngine::initPipelines()
 {
 	initBackgroundPipelines();
 
-	initMeshPipeline();
+	//initMeshPipeline();
 
 	metalRoughMaterial.buildPipelines(this);
 }
@@ -758,7 +821,8 @@ void VulkanEngine::initDescriptors()
 
 	std::vector < DescriptorAllocatorGrowable ::PoolSizeRatio > sizes =
 	{
-		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 }
+		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 }
 	};
 
 	globalDescriptorAllocator.init(_device, 10, sizes);
@@ -782,11 +846,12 @@ void VulkanEngine::initDescriptors()
 	}
 	_drawImageDescriptors = globalDescriptorAllocator.allocate(_device, _drawImageDescriptorLayout);
 
-	DescriptorWriter writer;
-	writer.writeImage(0, _drawImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+	{
+		DescriptorWriter writer;
+		writer.writeImage(0, _drawImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
 
-	writer.updateSet(_device, _drawImageDescriptors);
-
+		writer.updateSet(_device, _drawImageDescriptors);
+	}
 
 	_mainDeletionQueue.pushFunction([&]() {
 		globalDescriptorAllocator.destroyPools(_device);
@@ -885,10 +950,10 @@ void VulkanEngine::initBackgroundPipelines() {
 		vkDestroyPipeline(_device, gradient.pipeline, nullptr);
 		});
 }
-
+/*
 void VulkanEngine::initMeshPipeline() {
 	VkShaderModule triangleFragShader;
-	if (!vkutil::loadShaderModule("../../shaders/texture_image.frag.spv", _device, &triangleFragShader)) {
+	if (!vkutil::loadShaderModule("../../shaders/mesh.frag.spv", _device, &triangleFragShader)) {
 		fmt::print("Error when building the triangle fragment shader module");
 	}
 	else {
@@ -951,7 +1016,7 @@ void VulkanEngine::initMeshPipeline() {
 		});
 
 }
-
+*/
 
 
 void VulkanEngine::immediateSubmit(std::function<void(VkCommandBuffer* commandBuffer)>&& function)
@@ -1142,13 +1207,19 @@ void VulkanEngine::destroyImage(const AllocatedImage& img)
 void GLTFMetallicRoughness::buildPipelines(VulkanEngine* engine)
 {
 	VkShaderModule meshFragShader;
-	if (!vkutil::loadShaderModule("../../shaders/mesh.frag.spv", engine->_device, &meshFragShader)) {
+	if (vkutil::loadShaderModule("../../shaders/mesh.frag.spv", engine->_device, &meshFragShader)) {
+		fmt::println("Mesh fragment shader module loaded successfully");
+	}
+	else {
 		fmt::println("Error when building the mesh fragment shader module");
 	}
-
 	VkShaderModule meshVertexShader;
-	if (!vkutil::loadShaderModule("../../shaders/mesh.vert.spv", engine->_device, &meshVertexShader)) {
+	if (vkutil::loadShaderModule("../../shaders/mesh.vert.spv", engine->_device, &meshVertexShader)) {
+		fmt::println("Mesh vertex shader module loaded successfully");
+	}
+	else {
 		fmt::println("Error when building the mesh vertex shader module");
+
 	}
 
 	VkPushConstantRange matrixRange{};
@@ -1163,8 +1234,7 @@ void GLTFMetallicRoughness::buildPipelines(VulkanEngine* engine)
 
 	materialLayout = layoutBuilder.build(engine->_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 
-	VkDescriptorSetLayout layouts[] = { engine->_gpuSceneDataDescriptorLayout,
-		materialLayout };
+	VkDescriptorSetLayout layouts[] = { engine->_gpuSceneDataDescriptorLayout, materialLayout };
 
 	VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::PipelineLayoutCreateInfo();
 	mesh_layout_info.setLayoutCount = 2;
