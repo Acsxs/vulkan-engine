@@ -9,7 +9,7 @@
 #include <camera.h>
 
 
-struct GLTFMetallicRoughness {
+struct GLTFSpecularRoughness {
 	MaterialPipeline opaquePipeline;
 	MaterialPipeline transparentPipeline;
 
@@ -17,16 +17,16 @@ struct GLTFMetallicRoughness {
 
 	struct MaterialConstants {
 		glm::vec4 colorFactors;
-		glm::vec4 metallicRoughnessFactors;
+		glm::vec4 specularRoughnessFactors;
 		//padding, we need it anyway for uniform buffers
 		glm::vec4 extra[14];
 	};
 
 	struct MaterialResources {
-		AllocatedImage colorImage;
-		VkSampler colorSampler;
-		AllocatedImage metalRoughImage;
-		VkSampler metalRoughSampler;
+		AllocatedImage albedo;
+		VkSampler albedoSampler;
+		AllocatedImage specularRoughnessImage;
+		VkSampler specularRoughnessSampler;
 		VkBuffer dataBuffer;
 		uint32_t dataBufferOffset;
 	};
@@ -133,6 +133,8 @@ public:
 
 	DrawContext mainDrawContext;
 	std::unordered_map<std::string, std::shared_ptr<Node>> loadedNodes;
+	//std::unordered_map<std::string, std::shared_ptr<LoadedGLTF>> loadedScenes;
+
 
 
 	VkQueue _graphicsQueue;
@@ -189,7 +191,7 @@ public:
 	VkSampler _defaultSamplerNearest;
 
 	MaterialInstance defaultData;
-	GLTFMetallicRoughness metalRoughMaterial;
+	GLTFSpecularRoughness specularRoughnessMaterial;
 
 	Camera mainCamera;
 
