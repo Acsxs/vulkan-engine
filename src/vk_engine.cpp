@@ -60,8 +60,8 @@ void VulkanEngine::init()
 	initImgui();
 	initDefaultData();
 
-	mainCamera.velocity = glm::vec3(0.f);
-	mainCamera.position = glm::vec3(0, 0, 5);
+	mainCamera.velocity = glm::vec3(0.f); 
+	mainCamera.position = glm::vec3(30.f, -00.f, -085.f);
 
 	mainCamera.pitch = 0;
 	mainCamera.yaw = 0;
@@ -75,6 +75,9 @@ void VulkanEngine::cleanup()
 	if (_isInitialized) {
 
 		vkDeviceWaitIdle(_device);
+
+		loadedScenes.clear();
+
 		for (auto& mesh : testMeshes) {
 			destroyBuffer(mesh->meshBuffers.indexBuffer);
 			destroyBuffer(mesh->meshBuffers.vertexBuffer);
@@ -329,8 +332,8 @@ void VulkanEngine::drawGeometry(VkCommandBuffer* commandBuffer) {
 	scissor.extent.height = _drawExtent.height;
 
 	vkCmdBeginRendering(*commandBuffer, &renderInfo);
-	for (const RenderObject& draw : mainDrawContext.OpaqueSurfaces) {
 
+	auto draw = [&](const RenderObject& draw) {
 		vkCmdBindPipeline(*commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->pipeline);
 		vkCmdBindDescriptorSets(*commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 0, 1, &globalDescriptor, 0, nullptr);
 		vkCmdBindDescriptorSets(*commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->layout, 1, 1, &draw.material->materialSet, 0, nullptr);
@@ -346,7 +349,16 @@ void VulkanEngine::drawGeometry(VkCommandBuffer* commandBuffer) {
 		vkCmdPushConstants(*commandBuffer, draw.material->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GPUDrawPushConstants), &pushConstants);
 
 		vkCmdDrawIndexed(*commandBuffer, draw.indexCount, 1, draw.firstIndex, 0, 0);
+		};
+
+	for (auto& r : mainDrawContext.OpaqueSurfaces) {
+		draw(r);
 	}
+
+	for (auto& r : mainDrawContext.TransparentSurfaces) {
+		draw(r);
+	}
+
 
 	vkCmdEndRendering(*commandBuffer);
 }
@@ -370,7 +382,7 @@ void VulkanEngine::updateScene()
 	mainDrawContext.OpaqueSurfaces.clear();
 
 	loadedNodes["Suzanne"]->draw(glm::mat4{ 1.f }, mainDrawContext);
-	//loadedScenes["structure"]->draw(glm::mat4{ 1.f }, mainDrawContext);
+	loadedScenes["structure"]->draw(glm::mat4{ 1.f }, mainDrawContext);
 
 	mainCamera.update();
 
@@ -806,11 +818,11 @@ void VulkanEngine::initDefaultData() {
 		loadedNodes[m->name] = std::move(newNode);
 	}
 	std::string structurePath = { "..\\..\\assets\\structure.glb" };
-	/*auto structureFile = loadGltf(this, structurePath);
+	auto structureFile = loadGltf(this, structurePath);
 
 	assert(structureFile.has_value());
 
-	loadedScenes["structure"] = *structureFile;*/
+	loadedScenes["structure"] = *structureFile;
 }
 
 void VulkanEngine::initPipelines()
