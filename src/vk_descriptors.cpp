@@ -249,3 +249,4 @@ void DescriptorWriter::updateSet(VkDevice device, VkDescriptorSet set)
 
     vkUpdateDescriptorSets(device, (uint32_t)writes.size(), writes.data(), 0, nullptr);
 }
+

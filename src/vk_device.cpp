@@ -71,6 +71,7 @@ AllocatedImage VulkanDevice::createImage(VkExtent3D size, VkFormat format, VkIma
 	AllocatedImage newImage;
 	newImage.imageFormat = format;
 	newImage.imageExtent = size;
+	newImage.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
 	VkImageCreateInfo img_info = vkinit::ImageCreateInfo(format, usage, size);
 	if (mipmapped) {
@@ -103,37 +104,17 @@ AllocatedImage VulkanDevice::createImage(VkExtent3D size, VkFormat format, VkIma
 
 AllocatedImage VulkanDevice::createImage(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool mipmapped)
 {
-	size_t data_size = size.depth * size.width * size.height * 4;
-	AllocatedBuffer uploadbuffer = createBuffer(data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+	size_t dataSize = size.depth * size.width * size.height * 4;
+	AllocatedBuffer uploadBuffer = createBuffer(dataSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+	uploadBuffer.uploadData(data, dataSize);
 
-	memcpy(uploadbuffer.info.pMappedData, data, data_size);
+	AllocatedImage newImage = createImage(size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, mipmapped);
 
-	AllocatedImage new_image = createImage(size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, mipmapped);
+	immediateSubmit([&](VkCommandBuffer* commandBuffer) { uploadBuffer.copyToImage(commandBuffer, newImage, 0, 0, 0, aspect, size); });
 
-	immediateSubmit([&](VkCommandBuffer* commandBuffer) {
-		vkutil::transitionImage(commandBuffer, &new_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	destroyBuffer(uploadBuffer);
 
-		VkBufferImageCopy copyRegion = {};
-		copyRegion.bufferOffset = 0;
-		copyRegion.bufferRowLength = 0;
-		copyRegion.bufferImageHeight = 0;
-
-		copyRegion.imageSubresource.aspectMask = aspect;
-		copyRegion.imageSubresource.mipLevel = 0;
-		copyRegion.imageSubresource.baseArrayLayer = 0;
-		copyRegion.imageSubresource.layerCount = 1;
-		copyRegion.imageExtent = size;
-
-		// copy the buffer into the image
-		vkCmdCopyBufferToImage(*commandBuffer, uploadbuffer.buffer, new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
-
-		vkutil::transitionImage(commandBuffer, &new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		});
-
-	destroyBuffer(uploadbuffer);
-
-	return new_image;
+	return newImage;
 }
 
 void VulkanDevice::destroyImage(const AllocatedImage& img)

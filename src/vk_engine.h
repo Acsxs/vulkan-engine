@@ -122,8 +122,8 @@ public:
 
 	VkInstance _instance;
 	VkDebugUtilsMessengerEXT _debug_messenger;
-	VkPhysicalDevice _physicalDevice;
-	VkDevice _device;
+
+	VulkanDevice _vulkanDevice;
 
 	FrameData _frames[FRAMES_IN_FLIGHT];
 
@@ -135,8 +135,6 @@ public:
 	std::unordered_map<std::string, std::shared_ptr<Node>> loadedNodes;
 
 
-	VkQueue _graphicsQueue;
-	uint32_t _graphicsQueueFamily;	
 
 	VkSurfaceKHR _surface;
 	VkSwapchainKHR _swapchain;

@@ -1,9 +1,8 @@
-#include <vk_images.h>
+#include <vk_resources.h>
 
-void vkutil::transitionImage(
-    VkCommandBuffer* commandBuffer, 
-    VkImage* image, 
-    VkImageLayout currentLayout, 
+
+void AllocatedImage::transitionImage(
+    VkCommandBuffer* commandBuffer,
     VkImageLayout newLayout,
     VkImageAspectFlags aspectMask,
     VkPipelineStageFlagBits2 srcStageMask,
@@ -25,12 +24,12 @@ void vkutil::transitionImage(
     imageBarrier.srcAccessMask = srcAccessMask;
     imageBarrier.dstAccessMask = dstAccessMask; 
 
-    imageBarrier.oldLayout = currentLayout;
+    imageBarrier.oldLayout = imageLayout;
     imageBarrier.newLayout = newLayout;
 
     //VkImageAspectFlags aspectMask = (newLayout == VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
     imageBarrier.subresourceRange = vkinit::ImageSubresourceRange(aspectMask);
-    imageBarrier.image = *image;
+    imageBarrier.image = image;
 
     VkDependencyInfo dependencyInfo{};
     dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
@@ -38,21 +37,24 @@ void vkutil::transitionImage(
 
     dependencyInfo.imageMemoryBarrierCount = 1;
     dependencyInfo.pImageMemoryBarriers = &imageBarrier;
+  
 
     vkCmdPipelineBarrier2(*commandBuffer, &dependencyInfo);
+
+    imageLayout = newLayout;
 }
 
-void vkutil::copyImageToImage(VkCommandBuffer* commandBuffer, VkImage source, VkImage* destination, VkExtent2D srcSize, VkExtent2D dstSize, VkImageAspectFlags aspectMask)
+void AllocatedImage::copyToImage(VkCommandBuffer* commandBuffer, VkImage* destination, VkExtent3D dstSize, VkImageAspectFlags aspectMask)
 {
     VkImageBlit2 blitRegion{ .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2, .pNext = nullptr };
 
-    blitRegion.srcOffsets[1].x = srcSize.width;
-    blitRegion.srcOffsets[1].y = srcSize.height;
-    blitRegion.srcOffsets[1].z = 1;
+    blitRegion.srcOffsets[1].x = imageExtent.width;
+    blitRegion.srcOffsets[1].y = imageExtent.height;
+    blitRegion.srcOffsets[1].z = imageExtent.depth;
 
     blitRegion.dstOffsets[1].x = dstSize.width;
     blitRegion.dstOffsets[1].y = dstSize.height;
-    blitRegion.dstOffsets[1].z = 1;
+    blitRegion.dstOffsets[1].z = dstSize.depth;
 
     blitRegion.srcSubresource.aspectMask = aspectMask;
     blitRegion.srcSubresource.baseArrayLayer = 0;
@@ -67,11 +69,37 @@ void vkutil::copyImageToImage(VkCommandBuffer* commandBuffer, VkImage source, Vk
     VkBlitImageInfo2 blitInfo{ .sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2, .pNext = nullptr };
     blitInfo.dstImage = *destination;
     blitInfo.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    blitInfo.srcImage = source;
+    blitInfo.srcImage = image;
     blitInfo.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     blitInfo.filter = VK_FILTER_LINEAR;
     blitInfo.regionCount = 1;
     blitInfo.pRegions = &blitRegion;
 
     vkCmdBlitImage2(*commandBuffer, &blitInfo);
+}
+
+void AllocatedBuffer::copyToBuffer(VkCommandBuffer* commandBuffer, AllocatedBuffer dstBuffer, size_t size, uint32_t srcOffset, uint32_t dstOffset) {
+    VkBufferCopy bufferCopy{ 0 };
+    bufferCopy.dstOffset = srcOffset;
+    bufferCopy.srcOffset = dstOffset;
+    bufferCopy.size = size;
+
+    vkCmdCopyBuffer(*commandBuffer, buffer, dstBuffer.buffer, 1, &bufferCopy);
+}
+
+void AllocatedBuffer::copyToImage(VkCommandBuffer* commandBuffer, AllocatedImage image, uint32_t srcOffset, uint32_t bufferRowLength, uint32_t bufferImageHeight, VkImageAspectFlags aspect, size_t size) {
+    image.transitionImage(commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    VkBufferImageCopy copyRegion = {};
+    copyRegion.bufferOffset = srcOffset;
+    copyRegion.bufferRowLength = bufferRowLength;
+    copyRegion.bufferImageHeight = bufferImageHeight;
+
+    copyRegion.imageSubresource.aspectMask = aspect;
+    copyRegion.imageSubresource.mipLevel = 0;
+    copyRegion.imageSubresource.baseArrayLayer = 0;
+    copyRegion.imageSubresource.layerCount = 1;
+    copyRegion.imageExtent = size;
+
+    vkCmdCopyBufferToImage(*commandBuffer, buffer, image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 }

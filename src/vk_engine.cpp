@@ -8,8 +8,9 @@
 
 #include <vk_initializers.h>
 #include <vk_types.h>
-#include <vk_images.h>
+#include <vk_resources.h>
 #include <vk_pipelines.h>
+#include <vk_device.h>
 
 #include <VkBootstrap.h>
 
@@ -74,7 +75,7 @@ void VulkanEngine::cleanup()
 {
 	if (_isInitialized) {
 
-		vkDeviceWaitIdle(_device);
+		vkDeviceWaitIdle(_vulkanDevice._logicalDevice);
 		for (auto& mesh : testMeshes) {
 			destroyBuffer(mesh->meshBuffers.indexBuffer);
 			destroyBuffer(mesh->meshBuffers.vertexBuffer);
@@ -83,11 +84,11 @@ void VulkanEngine::cleanup()
 		_mainDeletionQueue.flush();
 		for (int i = 0; i < FRAMES_IN_FLIGHT; i++) {
 
-			vkDestroyCommandPool(_device, _frames[i]._commandPool, nullptr);
+			vkDestroyCommandPool(_vulkanDevice._logicalDevice, _frames[i]._commandPool, nullptr);
 
-			vkDestroyFence(_device, _frames[i]._renderFence, nullptr);
-			vkDestroySemaphore(_device, _frames[i]._renderSemaphore, nullptr);
-			vkDestroySemaphore(_device, _frames[i]._swapchainSemaphore, nullptr);
+			vkDestroyFence(_vulkanDevice._logicalDevice, _frames[i]._renderFence, nullptr);
+			vkDestroySemaphore(_vulkanDevice._logicalDevice, _frames[i]._renderSemaphore, nullptr);
+			vkDestroySemaphore(_vulkanDevice._logicalDevice, _frames[i]._swapchainSemaphore, nullptr);
 
 			_frames[i]._deletionQueue.flush();
 		}
@@ -96,8 +97,9 @@ void VulkanEngine::cleanup()
 
 		vkDestroySurfaceKHR(_instance, _surface, nullptr);
 
-		vkDestroyDevice(_device, nullptr);
-		vkb::destroy_debug_utils_messenger(_instance, _debug_messenger);
+
+		_vulkanDevice.destroy();
+
 		vkDestroyInstance(_instance, nullptr);
 
 		SDL_DestroyWindow(_window);
@@ -109,15 +111,15 @@ void VulkanEngine::draw()
 	updateScene();
 
 	FrameData* currentFrame = &getCurrentFrame();
-	VK_CHECK(vkWaitForFences(_device, 1, &currentFrame->_renderFence, true, 1000000000));
+	VK_CHECK(vkWaitForFences(_vulkanDevice._logicalDevice, 1, &currentFrame->_renderFence, true, 1000000000));
 	currentFrame->_deletionQueue.flush();
-	currentFrame->_frameDescriptors.clearPools(_device);
+	currentFrame->_frameDescriptors.clearPools(_vulkanDevice._logicalDevice);
 
 	currentFrame->_deletionQueue.flush();
 
 	uint32_t swapchainImageIndex;
 
-	VkResult e = vkAcquireNextImageKHR(_device, _swapchain, 1000000000, currentFrame->_swapchainSemaphore, nullptr, &swapchainImageIndex);
+	VkResult e = vkAcquireNextImageKHR(_vulkanDevice._logicalDevice, _swapchain, 1000000000, currentFrame->_swapchainSemaphore, nullptr, &swapchainImageIndex);
 	if (e == VK_ERROR_OUT_OF_DATE_KHR) {
 		rebuildSwapchain();
 		return;
@@ -136,14 +138,16 @@ void VulkanEngine::draw()
 
 	VK_CHECK(vkBeginCommandBuffer(currentFrame->_mainCommandBuffer, &commandBufferBeginInfo));
 
-	vkutil::transitionImage(&currentFrame->_mainCommandBuffer, &_drawImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+	_drawImage.transitionImage(&currentFrame->_mainCommandBuffer, VK_IMAGE_LAYOUT_GENERAL);
 
 	drawBackground(&currentFrame->_mainCommandBuffer);
 
-	vkutil::transitionImage(&currentFrame->_mainCommandBuffer, &_drawImage.image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-	vkutil::transitionImage(&currentFrame->_mainCommandBuffer, &_depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
+	_drawImage.transitionImage(&currentFrame->_mainCommandBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	_depthImage.transitionImage(&currentFrame->_mainCommandBuffer, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
 
 	drawGeometry(&currentFrame->_mainCommandBuffer);
+
+	_drawImage.transitionImage(&currentFrame->_mainCommandBuffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
 	vkutil::transitionImage(&currentFrame->_mainCommandBuffer, &_drawImage.image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 	vkutil::transitionImage(&currentFrame->_mainCommandBuffer, &_swapchainImages[swapchainImageIndex], VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -950,73 +954,6 @@ void VulkanEngine::initBackgroundPipelines() {
 		vkDestroyPipeline(_device, gradient.pipeline, nullptr);
 		});
 }
-/*
-void VulkanEngine::initMeshPipeline() {
-	VkShaderModule triangleFragShader;
-	if (!vkutil::loadShaderModule("../../shaders/mesh.frag.spv", _device, &triangleFragShader)) {
-		fmt::print("Error when building the triangle fragment shader module");
-	}
-	else {
-		fmt::print("Triangle fragment shader succesfully loaded");
-	}
-
-	VkShaderModule triangleVertexShader;
-	if (!vkutil::loadShaderModule("../../shaders/mesh.vert.spv", _device, &triangleVertexShader)) {
-		fmt::print("Error when building the triangle vertex shader module");
-	}
-	else {
-		fmt::print("Triangle vertex shader succesfully loaded");
-	}
-
-	VkPushConstantRange bufferRange{};
-	bufferRange.offset = 0;
-	bufferRange.size = sizeof(GPUDrawPushConstants);
-	bufferRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-	VkPipelineLayoutCreateInfo pipelineLayoutInfo = vkinit::PipelineLayoutCreateInfo();
-	pipelineLayoutInfo.pPushConstantRanges = &bufferRange;
-	pipelineLayoutInfo.pushConstantRangeCount = 1;
-	pipelineLayoutInfo.pSetLayouts = &_singleImageDescriptorLayout;
-	pipelineLayoutInfo.setLayoutCount = 1;
-
-	VK_CHECK(vkCreatePipelineLayout(_device, &pipelineLayoutInfo, nullptr, &_meshPipelineLayout));
-
-	PipelineBuilder pipelineBuilder;
-
-	//use the triangle layout we created
-	pipelineBuilder._pipelineLayout = _meshPipelineLayout;
-	//connecting the vertex and pixel shaders to the pipeline
-	pipelineBuilder.setShaders(triangleVertexShader, triangleFragShader);
-	//it will draw triangles
-	pipelineBuilder.setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-	//filled triangles
-	pipelineBuilder.setPolygonMode(VK_POLYGON_MODE_FILL);
-	//no backface culling
-	pipelineBuilder.setCullMode(VK_CULL_MODE_BACK_BIT, VK_FRONT_FACE_CLOCKWISE);
-	pipelineBuilder.setMultisamplingNone();
-	//pipelineBuilder.enableBlendingAdditive();
-	pipelineBuilder.enableBlendingAlphaBlend();
-
-	pipelineBuilder.enableDepthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
-
-	//connect the image format we will draw into, from draw image
-	pipelineBuilder.setColorAttachmentFormat(_drawImage.imageFormat);
-	pipelineBuilder.setDepthFormat(_depthImage.imageFormat);
-
-	//finally build the pipeline
-	_meshPipeline = pipelineBuilder.buildPipeline(_device);
-
-	//clean structures
-	vkDestroyShaderModule(_device, triangleFragShader, nullptr);
-	vkDestroyShaderModule(_device, triangleVertexShader, nullptr);
-
-	_mainDeletionQueue.pushFunction([&]() {
-		vkDestroyPipelineLayout(_device, _meshPipelineLayout, nullptr);
-		vkDestroyPipeline(_device, _meshPipeline, nullptr);
-		});
-
-}
-*/
 
 
 void VulkanEngine::immediateSubmit(std::function<void(VkCommandBuffer* commandBuffer)>&& function)
@@ -1040,33 +977,6 @@ void VulkanEngine::immediateSubmit(std::function<void(VkCommandBuffer* commandBu
 	VK_CHECK(vkWaitForFences(_device, 1, &_immFence, true, 9999999999));
 }
 
-
-
-AllocatedBuffer VulkanEngine::createBuffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage)
-{
-	// allocate buffer
-	VkBufferCreateInfo bufferCreateInfo = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-	bufferCreateInfo.pNext = nullptr;
-	bufferCreateInfo.size = allocSize;
-
-	bufferCreateInfo.usage = usage;
-
-	VmaAllocationCreateInfo bufferAllocationCreateInfo = {};
-	bufferAllocationCreateInfo.usage = memoryUsage;
-	bufferAllocationCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-	AllocatedBuffer newBuffer;
-
-	// allocate the buffer
-	VK_CHECK(vmaCreateBuffer(_allocator, &bufferCreateInfo, &bufferAllocationCreateInfo, &newBuffer.buffer, &newBuffer.allocation,
-		&newBuffer.info));
-
-	return newBuffer;
-}
-
-void VulkanEngine::destroyBuffer(const AllocatedBuffer& buffer)
-{
-	vmaDestroyBuffer(_allocator, buffer.buffer, buffer.allocation);
-}
 
 
 
@@ -1113,84 +1023,6 @@ GPUMeshBuffers VulkanEngine::uploadMesh(std::span<uint32_t> indices, std::span<V
 
 	return newSurface;
 
-}
-
-
-
-AllocatedImage VulkanEngine::createImage(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped)
-{
-	AllocatedImage newImage;
-	newImage.imageFormat = format;
-	newImage.imageExtent = size;
-
-	VkImageCreateInfo img_info = vkinit::ImageCreateInfo(format, usage, size);
-	if (mipmapped) {
-		img_info.mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(size.width, size.height)))) + 1;
-	}
-
-	// always allocate images on dedicated GPU memory
-	VmaAllocationCreateInfo allocinfo = {};
-	allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-	allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-	// allocate and create the image
-	VK_CHECK(vmaCreateImage(_allocator, &img_info, &allocinfo, &newImage.image, &newImage.allocation, nullptr));
-
-	// if the format is a depth format, we will need to have it use the correct
-	// aspect flag
-	VkImageAspectFlags aspectFlag = VK_IMAGE_ASPECT_COLOR_BIT;
-	if (format == VK_FORMAT_D32_SFLOAT) {
-		aspectFlag = VK_IMAGE_ASPECT_DEPTH_BIT;
-	}
-
-	// build a image-view for the image
-	VkImageViewCreateInfo view_info = vkinit::ImageViewCreateInfo(format, newImage.image, aspectFlag);
-	view_info.subresourceRange.levelCount = img_info.mipLevels;
-
-	VK_CHECK(vkCreateImageView(_device, &view_info, nullptr, &newImage.imageView));
-
-	return newImage;
-}
-
-AllocatedImage VulkanEngine::createImage(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped)
-{
-	size_t data_size = size.depth * size.width * size.height * 4;
-	AllocatedBuffer uploadbuffer = createBuffer(data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-	memcpy(uploadbuffer.info.pMappedData, data, data_size);
-
-	AllocatedImage new_image = createImage(size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, mipmapped);
-
-	immediateSubmit([&](VkCommandBuffer* commandBuffer) {
-		vkutil::transitionImage(commandBuffer, &new_image.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-		VkBufferImageCopy copyRegion = {};
-		copyRegion.bufferOffset = 0;
-		copyRegion.bufferRowLength = 0;
-		copyRegion.bufferImageHeight = 0;
-
-		copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		copyRegion.imageSubresource.mipLevel = 0;
-		copyRegion.imageSubresource.baseArrayLayer = 0;
-		copyRegion.imageSubresource.layerCount = 1;
-		copyRegion.imageExtent = size;
-
-		// copy the buffer into the image
-		vkCmdCopyBufferToImage(*commandBuffer, uploadbuffer.buffer, new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
-
-		vkutil::transitionImage(commandBuffer, &new_image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		});
-
-	destroyBuffer(uploadbuffer);
-
-	return new_image;
-}
-
-void VulkanEngine::destroyImage(const AllocatedImage& img)
-{
-	vkDestroyImageView(_device, img.imageView, nullptr);
-	vmaDestroyImage(_allocator, img.image, img.allocation);
 }
 
 
