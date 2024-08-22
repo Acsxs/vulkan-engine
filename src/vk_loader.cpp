@@ -8,10 +8,12 @@
 #include "vk_engine.h"
 #include "vk_initializers.h"
 #include <glm/gtx/quaternion.hpp>
+#include <glm/gtx/normal.hpp>
 
 #include <fastgltf/glm_element_traits.hpp>
 #include <fastgltf/parser.hpp>
 #include <fastgltf/tools.hpp>
+#include <tuple>
 
 
 
@@ -123,6 +125,39 @@ std::optional<AllocatedImage> loadImage(VulkanEngine* engine, fastgltf::Asset& a
     else {
         return newImage;
     }
+}
+
+// Make this a compute shader
+std::vector<Vertex> recompileMesh(std::vector<uint32_t> indices, std::vector<Vertex> vertices) {
+    std::vector<Vertex> newVertices = vertices;
+    for (int i = 0; i < indices.size(); i += 3) {
+        Vertex v1 = newVertices[indices[i]];
+        Vertex v2 = newVertices[indices[i + 1]];
+        Vertex v3 = newVertices[indices[i + 2]];
+
+        glm::vec3 dPos1 = v2.position - v1.position;
+        glm::vec3 dPos2 = v3.position - v1.position;
+
+        glm::vec2 dUV1 = glm::vec2(v2.uv_x - v1.uv_x, v2.uv_y - v1.uv_y);
+        glm::vec2 dUV2 = glm::vec2(v3.uv_x - v1.uv_x, v3.uv_y - v1.uv_y);
+
+        float r = 1.0f / (dUV1.x * dUV2.y - dUV1.y * dUV2.x);
+        glm::vec4 tangent = glm::vec4((dPos1 * dUV2.y - dPos2 * dUV1.y) * r, 0.f);
+        glm::vec4 biTangent = glm::vec4((dPos2 * dUV1.x - dPos1 * dUV2.x) * r, 0.f);
+
+        newVertices[indices[i]].tangent += tangent;
+        newVertices[indices[i]].biTangent += biTangent;
+        newVertices[indices[i + 1]].tangent += tangent;
+        newVertices[indices[i + 1]].biTangent += biTangent;
+        newVertices[indices[i + 2]].tangent += tangent;
+        newVertices[indices[i + 2]].biTangent += biTangent;
+    }
+    /*for (int i = 0; i < vertices.size(); i++) {
+        Vertex vertex = newVertices[i];
+        newVertices[i].tangent = glm::normalize(vertex.tangent);
+        newVertices[i].biTangent = glm::normalize(vertex.biTangent);
+    }*/
+    return newVertices;
 }
 
 
@@ -364,8 +399,10 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
         // default the material textures
         materialResources.albedo = engine->_whiteImage;
         materialResources.albedoSampler = engine->_defaultSamplerLinear;
-        materialResources.specularRoughnessImage = engine->_whiteImage;
+        materialResources.specularRoughnessImage = engine->_greyImage;
         materialResources.specularRoughnessSampler = engine->_defaultSamplerLinear;
+        materialResources.normal = engine->_blackImage;
+        materialResources.normalSampler = engine->_defaultSamplerLinear;
 
         // set the uniform buffer for the material data
         materialResources.dataBuffer = file.materialDataBuffer.buffer;
@@ -378,7 +415,17 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
             materialResources.albedo = images[img];
             materialResources.albedoSampler = file.samplers[sampler];
         }
-        // build material
+        if (mat.pbrData.metallicRoughnessTexture.has_value()) {
+            size_t img = gltf.textures[mat.pbrData.metallicRoughnessTexture.value().textureIndex].imageIndex.value();
+            size_t sampler = gltf.textures[mat.pbrData.metallicRoughnessTexture.value().textureIndex].samplerIndex.value();
+
+            materialResources.specularRoughnessImage = images[img];
+            materialResources.specularRoughnessSampler = file.samplers[sampler];
+        }
+        if (mat.normalTexture.has_value()) {
+            size_t img = gltf.textures[mat.normalTexture.value().textureIndex].imageIndex.value();
+            materialResources.normal = images[img];
+        }
         newMat->data = engine->specularRoughnessMaterial.writeMaterial(engine->_device, passType, materialResources, file.descriptorPool);
 
         data_index++;
@@ -428,6 +475,8 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
                         newvtx.color = glm::vec4{ 1.f };
                         newvtx.uv_x = 0;
                         newvtx.uv_y = 0;
+                        newvtx.tangent = glm::vec4{ 0.f };
+                        newvtx.biTangent = glm::vec4{ 0.f };
                         vertices[initial_vtx + index] = newvtx;
                     });
             }
@@ -472,9 +521,12 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 
             newmesh->surfaces.push_back(newSurface);
         }
+        vertices = recompileMesh(indices, vertices);
 
         newmesh->meshBuffers = engine->uploadMesh(indices, vertices);
     }
+
+
     for (fastgltf::Node& node : gltf.nodes) {
         std::shared_ptr<Node> newNode;
 
@@ -529,9 +581,6 @@ std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::s
 
     return scene;
 }
-
-
-
 
 void LoadedGLTF::draw(const glm::mat4& topMatrix, DrawContext& ctx)
 {

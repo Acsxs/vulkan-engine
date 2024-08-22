@@ -27,6 +27,8 @@ struct GLTFSpecularRoughness {
 		VkSampler albedoSampler;
 		AllocatedImage specularRoughnessImage;
 		VkSampler specularRoughnessSampler;
+		AllocatedImage normal;
+		VkSampler normalSampler;
 		VkBuffer dataBuffer;
 		uint32_t dataBufferOffset;
 	};

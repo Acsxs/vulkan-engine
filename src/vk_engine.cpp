@@ -383,6 +383,7 @@ void VulkanEngine::updateScene()
 
 	loadedNodes["Suzanne"]->draw(glm::mat4{ 1.f }, mainDrawContext);
 	loadedScenes["structure"]->draw(glm::mat4{ 1.f }, mainDrawContext);
+	//loadedScenes["flower"]->draw(glm::mat4(1.f), mainDrawContext);
 
 	mainCamera.update();
 
@@ -398,11 +399,12 @@ void VulkanEngine::updateScene()
 	sceneData.view = view;
 	sceneData.proj = projection;
 	sceneData.viewproj = projection * view;
+	sceneData.viewPos = glm::vec4(mainCamera.position, 0);
 
 	//some default lighting parameters
-	sceneData.ambientColor = glm::vec4(.1f,.1f,.1f,1.f);
+	sceneData.ambientColor = glm::vec4(.2f,.2f,.2f,1.f);
 	sceneData.sunlightColor = glm::vec4(1.f,1.f,1.f,1.f);
-	sceneData.sunlightDirection = glm::vec4(0, 1, 0.5, 10.f);
+	sceneData.sunlightDirection = glm::vec4(0, -1, -0.5, 10.f);
 
 	for (int x = -3; x < 3; x++) {
 
@@ -786,6 +788,8 @@ void VulkanEngine::initDefaultData() {
 	materialResources.albedoSampler = _defaultSamplerLinear;
 	materialResources.specularRoughnessImage = _whiteImage;
 	materialResources.specularRoughnessSampler = _defaultSamplerLinear;
+	materialResources.normal = _blackImage;
+	materialResources.normalSampler = _defaultSamplerLinear;
 
 	//set the uniform buffer for the material data
 	AllocatedBuffer materialConstants = createBuffer(sizeof(GLTFSpecularRoughness::MaterialConstants), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
@@ -821,8 +825,12 @@ void VulkanEngine::initDefaultData() {
 	auto structureFile = loadGltf(this, structurePath);
 
 	assert(structureFile.has_value());
-
 	loadedScenes["structure"] = *structureFile;
+	std::string flowerPath = { "..\\..\\assets\\flower.glb" };
+	auto flowerFile = loadGltf(this, flowerPath);
+
+	assert(flowerFile.has_value());
+	loadedScenes["flower"] = *flowerFile;
 }
 
 void VulkanEngine::initPipelines()
@@ -1183,6 +1191,8 @@ void GLTFSpecularRoughness::buildPipelines(VulkanEngine* engine)
 	layoutBuilder.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 	layoutBuilder.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 	layoutBuilder.addBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+	layoutBuilder.addBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+
 
 	materialLayout = layoutBuilder.build(engine->_device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 
@@ -1206,7 +1216,7 @@ void GLTFSpecularRoughness::buildPipelines(VulkanEngine* engine)
 	pipelineBuilder.setShaders(meshVertexShader, meshFragShader);
 	pipelineBuilder.setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 	pipelineBuilder.setPolygonMode(VK_POLYGON_MODE_FILL);
-	pipelineBuilder.setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+	pipelineBuilder.setCullMode(VK_CULL_MODE_FRONT_BIT, VK_FRONT_FACE_CLOCKWISE);
 	pipelineBuilder.setMultisamplingNone();
 	pipelineBuilder.disableBlending();
 	pipelineBuilder.enableDepthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
@@ -1250,6 +1260,7 @@ MaterialInstance GLTFSpecularRoughness::writeMaterial(VkDevice device, MaterialP
 	writer.writeBuffer(0, resources.dataBuffer, sizeof(MaterialConstants), resources.dataBufferOffset, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 	writer.writeImage(1, resources.albedo.imageView, resources.albedoSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 	writer.writeImage(2, resources.specularRoughnessImage.imageView, resources.specularRoughnessSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+	writer.writeImage(3, resources.normal.imageView, resources.normalSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
 	writer.updateSet(device, matData.materialSet);
 

@@ -17,6 +17,7 @@ public:
 
     glm::mat4 getViewMatrix();
     glm::mat4 getRotationMatrix();
+    glm::mat4 getYawMatrix();
 
     void processSDLEvent(SDL_Event& e);
 
