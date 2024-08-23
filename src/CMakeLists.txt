@@ -3,18 +3,24 @@
 add_executable (engine 
   main.cpp
   vk_types.h
-  vk_initializers.cpp
-  vk_initializers.h
-  vk_images.h
-  vk_images.cpp 
   vk_descriptors.h
   vk_descriptors.cpp
-  vk_pipelines.h
-  vk_pipelines.cpp
+  vk_destructor.h
+  vk_destructor.cpp
+  vk_device.h
+  vk_device.cpp
   vk_engine.h
   vk_engine.cpp
+  vk_initializers.cpp
+  vk_initializers.h
   vk_loader.h
   vk_loader.cpp
+  vk_pipelines.h
+  vk_pipelines.cpp
+  vk_resources.h
+  vk_resources.cpp 
+  vk_swapchain.h
+  vk_swapchain.cpp 
   camera.cpp
   camera.h
 )

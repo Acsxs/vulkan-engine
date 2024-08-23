@@ -1,6 +1,6 @@
-#include <camera.h>
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/quaternion.hpp>
+#include "camera.h"
 
 void Camera::update()
 {

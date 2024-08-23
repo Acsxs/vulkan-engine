@@ -1,9 +1,17 @@
 ﻿#pragma once 
-#include <vk_types.h>
+#include "vk_types.h"
+#include "vk_device.h"
 
 namespace vkutil {
 
 	bool loadShaderModule(const char* filePath, VkDevice device, VkShaderModule* outShaderModule);
+};
+
+class VulkanPipeline {
+public:
+    void destroy(VulkanDevice* device) {};
+private:
+
 };
 
 class PipelineBuilder {

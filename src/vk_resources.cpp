@@ -1,7 +1,7 @@
-#include <vk_resources.h>
+#include "vk_resources.h"
 
 
-void AllocatedImage::transitionImage(
+void VulkanImage::transitionImage(
     VkCommandBuffer* commandBuffer,
     VkImageLayout newLayout,
     VkImageAspectFlags aspectMask,
@@ -44,7 +44,7 @@ void AllocatedImage::transitionImage(
     imageLayout = newLayout;
 }
 
-void AllocatedImage::copyToImage(VkCommandBuffer* commandBuffer, VkImage* destination, VkExtent3D dstSize, VkImageAspectFlags aspectMask)
+void VulkanImage::copyToImage(VkCommandBuffer* commandBuffer, VkImage* destination, VkExtent3D dstSize, VkImageAspectFlags aspectMask)
 {
     VkImageBlit2 blitRegion{ .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2, .pNext = nullptr };
 
@@ -78,7 +78,41 @@ void AllocatedImage::copyToImage(VkCommandBuffer* commandBuffer, VkImage* destin
     vkCmdBlitImage2(*commandBuffer, &blitInfo);
 }
 
-void AllocatedBuffer::copyToBuffer(VkCommandBuffer* commandBuffer, AllocatedBuffer dstBuffer, size_t size, uint32_t srcOffset, uint32_t dstOffset) {
+void VulkanImage::copyToImage(VkCommandBuffer* commandBuffer, VkImage* destination, VkExtent2D dstSize, VkImageAspectFlags aspectMask)
+{
+    VkImageBlit2 blitRegion{ .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2, .pNext = nullptr };
+
+    blitRegion.srcOffsets[1].x = imageExtent.width;
+    blitRegion.srcOffsets[1].y = imageExtent.height;
+    blitRegion.srcOffsets[1].z = 1;
+
+    blitRegion.dstOffsets[1].x = dstSize.width;
+    blitRegion.dstOffsets[1].y = dstSize.height;
+    blitRegion.dstOffsets[1].z = 1;
+
+    blitRegion.srcSubresource.aspectMask = aspectMask;
+    blitRegion.srcSubresource.baseArrayLayer = 0;
+    blitRegion.srcSubresource.layerCount = 1;
+    blitRegion.srcSubresource.mipLevel = 0;
+
+    blitRegion.dstSubresource.aspectMask = aspectMask;
+    blitRegion.dstSubresource.baseArrayLayer = 0;
+    blitRegion.dstSubresource.layerCount = 1;
+    blitRegion.dstSubresource.mipLevel = 0;
+
+    VkBlitImageInfo2 blitInfo{ .sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2, .pNext = nullptr };
+    blitInfo.dstImage = *destination;
+    blitInfo.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    blitInfo.srcImage = image;
+    blitInfo.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    blitInfo.filter = VK_FILTER_LINEAR;
+    blitInfo.regionCount = 1;
+    blitInfo.pRegions = &blitRegion;
+
+    vkCmdBlitImage2(*commandBuffer, &blitInfo);
+}
+
+void VulkanBuffer::copyToBuffer(VkCommandBuffer* commandBuffer, VulkanBuffer dstBuffer, size_t size, uint32_t srcOffset, uint32_t dstOffset) {
     VkBufferCopy bufferCopy{ 0 };
     bufferCopy.dstOffset = srcOffset;
     bufferCopy.srcOffset = dstOffset;
@@ -87,7 +121,7 @@ void AllocatedBuffer::copyToBuffer(VkCommandBuffer* commandBuffer, AllocatedBuff
     vkCmdCopyBuffer(*commandBuffer, buffer, dstBuffer.buffer, 1, &bufferCopy);
 }
 
-void AllocatedBuffer::copyToImage(VkCommandBuffer* commandBuffer, AllocatedImage image, uint32_t srcOffset, uint32_t bufferRowLength, uint32_t bufferImageHeight, VkImageAspectFlags aspect, size_t size) {
+void VulkanBuffer::copyToImage(VkCommandBuffer* commandBuffer, VulkanImage image, uint32_t srcOffset, uint32_t bufferRowLength, uint32_t bufferImageHeight, VkImageAspectFlags aspect, VkExtent3D size) {
     image.transitionImage(commandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
     VkBufferImageCopy copyRegion = {};
@@ -103,3 +137,4 @@ void AllocatedBuffer::copyToImage(VkCommandBuffer* commandBuffer, AllocatedImage
 
     vkCmdCopyBufferToImage(*commandBuffer, buffer, image.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 }
+

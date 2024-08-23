@@ -1,9 +1,8 @@
 #pragma once
 
-#include <vk_types.h>
 #include <VkBootstrap.h>
+#include "vk_types.h"
 #include "vk_initializers.h"
-#include "vk_resources.h"
 
 
 

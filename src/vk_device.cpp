@@ -1,5 +1,5 @@
-#include "vk_device.h"
 
+#include "vk_device.h"
 
 void VulkanDevice::init(vkb::PhysicalDevice vkbPhysicalDevice, VkInstance instance) {
 
@@ -108,7 +108,7 @@ AllocatedImage VulkanDevice::createImage(void* data, VkExtent3D size, VkFormat f
 	AllocatedBuffer uploadBuffer = createBuffer(dataSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 	uploadBuffer.uploadData(data, dataSize);
 
-	AllocatedImage newImage = createImage(size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, mipmapped);
+	AllocatedImage newImage = createImage(size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, aspect, mipmapped);
 
 	immediateSubmit([&](VkCommandBuffer* commandBuffer) { uploadBuffer.copyToImage(commandBuffer, newImage, 0, 0, 0, aspect, size); });
 
