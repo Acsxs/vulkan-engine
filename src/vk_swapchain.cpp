@@ -46,7 +46,7 @@ void VulkanSwapchain::rebuildSwapchain(VulkanDevice* device, VkSurfaceKHR surfac
 	createSwapchain(device, surface, width, height);
 }
 
-void VulkanSwapchain::transitionImage(
+void VulkanSwapchain::transitionSwapchainImage(
     VkCommandBuffer* commandBuffer,
     uint32_t imageIndex,
     VkImageLayout currentLayout,

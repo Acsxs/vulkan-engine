@@ -37,9 +37,9 @@ using namespace std;
 void RenderData::init(VulkanDevice* device) {
 
 	VkCommandPoolCreateInfo commandPoolCreateInfo = vkinit::CommandPoolCreateInfo(device->getQueueFamilyIndex(VulkanDevice::GRAPHICS), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-	VkCommandBufferAllocateInfo commandBufferAllocateInfo = vkinit::CommandBufferAllocateInfo(_commandPool, 1);
-
 	VK_CHECK(vkCreateCommandPool(device->_logicalDevice, &commandPoolCreateInfo, nullptr, &_commandPool));
+
+	VkCommandBufferAllocateInfo commandBufferAllocateInfo = vkinit::CommandBufferAllocateInfo(_commandPool, 1);
 	VK_CHECK(vkAllocateCommandBuffers(device->_logicalDevice, &commandBufferAllocateInfo, &_mainCommandBuffer));
 
 	VkFenceCreateInfo fenceCreateInfo = vkinit::FenceCreateInfo(VK_FENCE_CREATE_SIGNALED_BIT);
@@ -88,6 +88,10 @@ void VulkanEngine::init()
 	initImgui();
 	initDefaultData();
 
+	for (int i = 0; i < FRAMES_IN_FLIGHT; i++) {
+		_renderData[i].init(&_vulkanDevice);
+	}
+
 	mainCamera.velocity = glm::vec3(0.f);
 	mainCamera.position = glm::vec3(0, 0, 5);
 
@@ -110,18 +114,18 @@ void VulkanEngine::cleanup()
 		_mainDestructor.destroy(&_vulkanDevice, nullptr);
 
 		for (int i = 0; i < FRAMES_IN_FLIGHT; i++) {
-			_frames[i]._frameDestructor.destroy(&_vulkanDevice, nullptr);
-			_frames[i].destroy(&_vulkanDevice);
+			_renderData[i]._frameDestructor.destroy(&_vulkanDevice, nullptr);
+			_renderData[i].destroy(&_vulkanDevice);
 		}
 
-		swapchain.destroySwapchain(&_vulkanDevice);
+		_swapchain.destroySwapchain(&_vulkanDevice);
 
 
 		vkDestroySurfaceKHR(_instance, _surface, nullptr);
 
 
 		_vulkanDevice.destroy();
-		vkDestroyDebugUtilsMessengerEXT(_instance, _debug_messenger, nullptr);
+		vkb::destroy_debug_utils_messenger(_instance, _debug_messenger, nullptr);
 		vkDestroyInstance(_instance, nullptr);
 
 		SDL_DestroyWindow(_window);
@@ -132,16 +136,16 @@ void VulkanEngine::draw()
 {
 	updateScene();
 
-	RenderData* currentFrame = &getCurrentFrame();
+	RenderData* currentFrame = &getCurrentRenderData();
 	currentFrame->_frameDestructor.destroy(&_vulkanDevice, &currentFrame->_renderFence);
 	currentFrame->_frameDescriptors.clearPools(_vulkanDevice._logicalDevice);
 
 
 	uint32_t swapchainImageIndex;
-	VkResult e = vkAcquireNextImageKHR(_vulkanDevice._logicalDevice, swapchain._swapchain, 1000000000, currentFrame->_swapchainSemaphore, nullptr, &swapchainImageIndex);
+	VkResult e = vkAcquireNextImageKHR(_vulkanDevice._logicalDevice, _swapchain._swapchain, 1000000000, currentFrame->_swapchainSemaphore, nullptr, &swapchainImageIndex);
 	if (e == VK_ERROR_OUT_OF_DATE_KHR) {
 		SDL_GetWindowSizeInPixels(_window, (int*)&_windowExtent.width, (int*)&_windowExtent.height);
-		swapchain.rebuildSwapchain(&_vulkanDevice, _surface, _windowExtent.height, _windowExtent.width);
+		_swapchain.rebuildSwapchain(&_vulkanDevice, _surface, _windowExtent.height, _windowExtent.width);
 		return;
 	}
 
@@ -167,16 +171,15 @@ void VulkanEngine::draw()
 	drawGeometry(&currentFrame->_mainCommandBuffer);
 
 	_drawImage.transitionImage(&currentFrame->_mainCommandBuffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-	_drawImage.transitionImage(&currentFrame->_mainCommandBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
-	swapchain.transitionImage(&currentFrame->_mainCommandBuffer, swapchainImageIndex, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-	_drawImage.copyToImage(&currentFrame->_mainCommandBuffer, &swapchain._swapchainImages[swapchainImageIndex], swapchain._swapchainExtent);
+	_swapchain.transitionSwapchainImage(&currentFrame->_mainCommandBuffer, swapchainImageIndex, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	_drawImage.copyToImage(&currentFrame->_mainCommandBuffer, &_swapchain._swapchainImages[swapchainImageIndex], _swapchain._swapchainExtent);
 
-	swapchain.transitionImage(&currentFrame->_mainCommandBuffer, swapchainImageIndex, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	_swapchain.transitionSwapchainImage(&currentFrame->_mainCommandBuffer, swapchainImageIndex, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-	drawImgui(&currentFrame->_mainCommandBuffer, swapchain._swapchainImageViews[swapchainImageIndex]);
+	drawImgui(&currentFrame->_mainCommandBuffer, _swapchain._swapchainImageViews[swapchainImageIndex]);
 
-	swapchain.transitionImage(&currentFrame->_mainCommandBuffer, swapchainImageIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+	_swapchain.transitionSwapchainImage(&currentFrame->_mainCommandBuffer, swapchainImageIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
 	VK_CHECK(vkEndCommandBuffer(currentFrame->_mainCommandBuffer));
 
@@ -185,19 +188,19 @@ void VulkanEngine::draw()
 
 	VkCommandBufferSubmitInfo commandBufferSubmitInfo = vkinit::CommandBufferSubmitInfo(currentFrame->_mainCommandBuffer);
 
-	VkSemaphoreSubmitInfo waitInfo = vkinit::SemaphoreSubmitInfo(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR, getCurrentFrame()._swapchainSemaphore);
-	VkSemaphoreSubmitInfo signalInfo = vkinit::SemaphoreSubmitInfo(VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, getCurrentFrame()._renderSemaphore);
+	VkSemaphoreSubmitInfo waitInfo = vkinit::SemaphoreSubmitInfo(VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT_KHR, getCurrentRenderData()._swapchainSemaphore);
+	VkSemaphoreSubmitInfo signalInfo = vkinit::SemaphoreSubmitInfo(VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT, getCurrentRenderData()._renderSemaphore);
 
 	VkSubmitInfo2 submitInfo = vkinit::SubmitInfo2(&commandBufferSubmitInfo, &signalInfo, &waitInfo);
 
-	VK_CHECK(vkQueueSubmit2(_vulkanDevice.getQueue(VulkanDevice::GRAPHICS), 1, &submitInfo, getCurrentFrame()._renderFence));
+	VK_CHECK(vkQueueSubmit2(_vulkanDevice.getQueue(VulkanDevice::GRAPHICS), 1, &submitInfo, getCurrentRenderData()._renderFence));
 	
 	VkPresentInfoKHR presentInfo = vkinit::PresentInfoKHR();
 
-	presentInfo.pSwapchains = &swapchain._swapchain;
+	presentInfo.pSwapchains = &_swapchain._swapchain;
 	presentInfo.swapchainCount = 1;
 
-	presentInfo.pWaitSemaphores = &getCurrentFrame()._renderSemaphore;
+	presentInfo.pWaitSemaphores = &getCurrentRenderData()._renderSemaphore;
 	presentInfo.waitSemaphoreCount = 1;
 
 	presentInfo.pImageIndices = &swapchainImageIndex;
@@ -314,14 +317,14 @@ void VulkanEngine::drawGeometry(VkCommandBuffer* commandBuffer) {
 	AllocatedBuffer gpuSceneDataBuffer = _vulkanDevice.createBuffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
 	//add it to the deletion queue of this frame so it gets deleted once its been used
-	getCurrentFrame()._frameDestructor.buffers.push_back(&gpuSceneDataBuffer);
+	getCurrentRenderData()._frameDestructor.buffers.push_back(&gpuSceneDataBuffer);
 
 	//write the buffer
 	GPUSceneData* sceneUniformData = (GPUSceneData*)gpuSceneDataBuffer.allocation->GetMappedData();
 	*sceneUniformData = sceneData;
 
 	//create a descriptor set that binds that buffer and update it
-	VkDescriptorSet globalDescriptor = getCurrentFrame()._frameDescriptors.allocate(_vulkanDevice._logicalDevice, _gpuSceneDataDescriptorLayout);
+	VkDescriptorSet globalDescriptor = getCurrentRenderData()._frameDescriptors.allocate(_vulkanDevice._logicalDevice, _gpuSceneDataDescriptorLayout);
 
 	DescriptorWriter writer;
 	writer.writeBuffer(0, gpuSceneDataBuffer.buffer, sizeof(GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER); // something makes bind 0 a sampler, find it
@@ -375,7 +378,7 @@ void VulkanEngine::drawGeometry(VkCommandBuffer* commandBuffer) {
 void VulkanEngine::drawImgui(VkCommandBuffer* commandBuffer, VkImageView targetImageView)
 {
 	VkRenderingAttachmentInfo colorAttachment = vkinit::RenderingAttachmentInfo(targetImageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-	VkRenderingInfo renderInfo = vkinit::RenderingInfo(swapchain._swapchainExtent, &colorAttachment, nullptr);
+	VkRenderingInfo renderInfo = vkinit::RenderingInfo(_swapchain._swapchainExtent, &colorAttachment, nullptr);
 
 	vkCmdBeginRendering(*commandBuffer, &renderInfo);
 
@@ -462,7 +465,7 @@ void VulkanEngine::initVulkan()
 
 void VulkanEngine::initSwapchain()
 {
-	swapchain.createSwapchain(&_vulkanDevice, _surface, _windowExtent.width, _windowExtent.height);
+	_swapchain.createSwapchain(&_vulkanDevice, _surface, _windowExtent.width, _windowExtent.height);
 
 	VkExtent3D drawImageExtent = {
 		_windowExtent.width,
@@ -491,24 +494,9 @@ void VulkanEngine::initSwapchain()
 	_mainDestructor.images.push_back(&_depthImage);
 }
 
-void VulkanEngine::initCommands()
-{
-	VkCommandPoolCreateInfo commandPoolCreateInfo = vkinit::CommandPoolCreateInfo(_vulkanDevice.getQueueFamilyIndex(VulkanDevice::GRAPHICS), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+void VulkanEngine::initCommands() {}
 
-	VK_CHECK(vkCreateCommandPool(_vulkanDevice._logicalDevice, &commandPoolCreateInfo, nullptr, &_immCommandPool));
-
-	VkCommandBufferAllocateInfo commandBufferAllocateInfo = vkinit::CommandBufferAllocateInfo(_immCommandPool, 1);
-
-	VK_CHECK(vkAllocateCommandBuffers(_vulkanDevice._logicalDevice, &commandBufferAllocateInfo, &_immCommandBuffer));
-}
-
-void VulkanEngine::initSyncStructures()
-{
-	VkFenceCreateInfo fenceCreateInfo = vkinit::FenceCreateInfo(VK_FENCE_CREATE_SIGNALED_BIT);
-	VkSemaphoreCreateInfo semaphoreCreateInfo = vkinit::SemaphoreCreateInfo();
-
-	VK_CHECK(vkCreateFence(_vulkanDevice._logicalDevice, &fenceCreateInfo, nullptr, &_immFence));
-}
+void VulkanEngine::initSyncStructures() {}
 
 void VulkanEngine::initImgui()
 {
@@ -550,7 +538,7 @@ void VulkanEngine::initImgui()
 
 	imguiInitInfo.PipelineRenderingCreateInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
 	imguiInitInfo.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
-	imguiInitInfo.PipelineRenderingCreateInfo.pColorAttachmentFormats = &swapchain._swapchainImageFormat;
+	imguiInitInfo.PipelineRenderingCreateInfo.pColorAttachmentFormats = &_swapchain._swapchainImageFormat;
 
 
 	imguiInitInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
@@ -601,7 +589,7 @@ void VulkanEngine::initDefaultData() {
 	_mainDestructor.images.push_back(&_blackImage);
 	_mainDestructor.images.push_back(&_errorCheckerboardImage);
 
-	//testMeshes = loadGLTFMeshes(this, "..\\..\\assets\\basicmesh.glb").value();
+	testMeshes = loadGLTFMeshes(this, "..\\..\\assets\\basicmesh.glb").value();
 
 	GLTFMetallicRoughness::MaterialResources materialResources;
 	//default the material textures
@@ -696,8 +684,8 @@ void VulkanEngine::initDescriptors()
 			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4 },
 		};
 
-		_frames[i]._frameDescriptors = DescriptorAllocatorGrowable{};
-		_frames[i]._frameDescriptors.init(_vulkanDevice._logicalDevice, 1000, frame_sizes);
+		_renderData[i]._frameDescriptors = DescriptorAllocatorGrowable{};
+		_renderData[i]._frameDescriptors.init(_vulkanDevice._logicalDevice, 1000, frame_sizes);
 	}
 }
 
@@ -773,24 +761,18 @@ void VulkanEngine::initBackgroundPipelines() {
 void VulkanEngine::cleanupVulkan()
 {
 	_vulkanDevice.destroy();
-	vkDestroyDebugUtilsMessengerEXT(_instance, _debug_messenger, nullptr);
+	vkb::destroy_debug_utils_messenger(_instance, _debug_messenger, nullptr);
 	vkDestroyInstance(_instance, nullptr);
 }
 
 void VulkanEngine::cleanupSwapchain()
 {
-	swapchain.destroySwapchain(&_vulkanDevice);
+	_swapchain.destroySwapchain(&_vulkanDevice);
 }
 
-void VulkanEngine::cleanupCommands()
-{
-	vkDestroyCommandPool(_vulkanDevice._logicalDevice, _immCommandPool, nullptr);
-}
+void VulkanEngine::cleanupCommands() {}
 
-void VulkanEngine::cleanupSyncStructures()
-{
-	vkDestroyFence(_vulkanDevice._logicalDevice, _immFence, nullptr);
-}
+void VulkanEngine::cleanupSyncStructures() {}
 
 void VulkanEngine::cleanupImgui()
 {
@@ -820,31 +802,6 @@ void VulkanEngine::cleanupBackgroundPipelines() {
 }
 
 
-
-void VulkanEngine::immediateSubmit(std::function<void(VkCommandBuffer* commandBuffer)>&& function)
-{
-	VK_CHECK(vkResetFences(_vulkanDevice._logicalDevice, 1, &_immFence));
-	VK_CHECK(vkResetCommandBuffer(_immCommandBuffer, 0));
-
-	VkCommandBufferBeginInfo cmdBeginInfo = vkinit::CommandBufferBeginInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
-
-	VK_CHECK(vkBeginCommandBuffer(_immCommandBuffer, &cmdBeginInfo));
-
-	function(&_immCommandBuffer);
-
-	VK_CHECK(vkEndCommandBuffer(_immCommandBuffer));
-
-	VkCommandBufferSubmitInfo commandBufferSubmitInfo = vkinit::CommandBufferSubmitInfo(_immCommandBuffer);
-	VkSubmitInfo2 submitInfo = vkinit::SubmitInfo2(&commandBufferSubmitInfo, nullptr, nullptr);
-
-	VK_CHECK(vkQueueSubmit2(_vulkanDevice.getQueue(VulkanDevice::GRAPHICS), 1, &submitInfo, _immFence));
-
-	VK_CHECK(vkWaitForFences(_vulkanDevice._logicalDevice, 1, &_immFence, true, 9999999999));
-}
-
-
-
-
 GPUMeshBuffers VulkanEngine::uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices)
 {
 	const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
@@ -867,7 +824,7 @@ GPUMeshBuffers VulkanEngine::uploadMesh(std::span<uint32_t> indices, std::span<V
 	// copy index buffer
 	memcpy((char*)data + vertexBufferSize, indices.data(), indexBufferSize);
 
-	immediateSubmit([&](VkCommandBuffer* commandBuffer) {
+	_vulkanDevice.immediateSubmit([&](VkCommandBuffer* commandBuffer) {
 		VkBufferCopy vertexCopy{ 0 };
 		vertexCopy.dstOffset = 0;
 		vertexCopy.srcOffset = 0;
@@ -888,8 +845,6 @@ GPUMeshBuffers VulkanEngine::uploadMesh(std::span<uint32_t> indices, std::span<V
 	return newSurface;
 
 }
-
-
 
 
 

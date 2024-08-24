@@ -14,7 +14,7 @@ struct VulkanSwapchain {
 	void destroySwapchain(VulkanDevice* device);
 	void createSwapchain(VulkanDevice* device, VkSurfaceKHR surface, uint32_t width, uint32_t height);
 	void rebuildSwapchain(VulkanDevice* device, VkSurfaceKHR surface, uint32_t width, uint32_t height);
-	void transitionImage(
+	void transitionSwapchainImage(
 		VkCommandBuffer* commandBuffer, 
 		uint32_t imageIndex,
 		VkImageLayout currentLayout,

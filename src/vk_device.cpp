@@ -31,6 +31,10 @@ void VulkanDevice::init(vkb::PhysicalDevice vkbPhysicalDevice, VkInstance instan
 
 	VkCommandBufferAllocateInfo commandBufferAllocateInfo = vkinit::CommandBufferAllocateInfo(_immCommandPool, 1);
 	VK_CHECK(vkAllocateCommandBuffers(_logicalDevice, &commandBufferAllocateInfo, &_immCommandBuffer));
+
+	VkFenceCreateInfo fenceCreateInfo = vkinit::FenceCreateInfo(VK_FENCE_CREATE_SIGNALED_BIT);
+	VkSemaphoreCreateInfo semaphoreCreateInfo = vkinit::SemaphoreCreateInfo();
+	VK_CHECK(vkCreateFence(_logicalDevice, &fenceCreateInfo, nullptr, &_immFence));
 }
 
 void VulkanDevice::destroy() {

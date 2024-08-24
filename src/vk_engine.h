@@ -115,9 +115,9 @@ public:
 	VulkanDevice _vulkanDevice;
 	ResourceDestructor _mainDestructor;
 
-	RenderData _frames[FRAMES_IN_FLIGHT];
+	RenderData _renderData[FRAMES_IN_FLIGHT];
 
-	RenderData& getCurrentFrame() { return _frames[_frameNumber % FRAMES_IN_FLIGHT]; };
+	RenderData& getCurrentRenderData() { return _renderData[_frameNumber % FRAMES_IN_FLIGHT]; };
 
 
 
@@ -129,7 +129,7 @@ public:
 
 	VkSurfaceKHR _surface;
 	
-	VulkanSwapchain swapchain;
+	VulkanSwapchain _swapchain;
 
 	VkExtent2D _drawExtent;
 
@@ -152,11 +152,6 @@ public:
 	AllocatedImage _drawImage;
 
 	AllocatedImage _depthImage;
-
-	// immediate submit structures
-	VkFence _immFence;
-	VkCommandBuffer _immCommandBuffer;
-	VkCommandPool _immCommandPool;
 
 	VkDescriptorSetLayout _singleImageDescriptorLayout;
 
@@ -189,7 +184,6 @@ public:
 
 	void run();
 
-	void immediateSubmit(std::function<void(VkCommandBuffer* commandBuffer)>&& function);
 	GPUMeshBuffers uploadMesh(std::span<uint32_t> indices, std::span<Vertex> vertices);
 
 private:

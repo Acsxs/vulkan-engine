@@ -26,11 +26,11 @@ struct MeshAsset {
 //forward declaration
 class VulkanEngine;
 
-//std::optional<std::vector<std::shared_ptr<MeshAsset>>> loadGLTFMeshes(VulkanEngine* engine, std::filesystem::path filePath);
+std::optional<std::vector<std::shared_ptr<MeshAsset>>> loadGLTFMeshes(VulkanEngine* engine, std::filesystem::path filePath);
 
 
 struct LoadedGLTF : public IRenderable {
-
+public:
     // storage for all the data on a given glTF file
     std::unordered_map<std::string, std::shared_ptr<MeshAsset>> meshes;
     std::unordered_map<std::string, std::shared_ptr<Node>> nodes;
@@ -50,9 +50,7 @@ struct LoadedGLTF : public IRenderable {
 
     ~LoadedGLTF() { clearAll(); };
 
-    virtual void draw(const glm::mat4& topMatrix, DrawContext& ctx);
-
+    virtual void draw(const glm::mat4& topMatrix, DrawContext& ctx) {};
 private:
-
-    void clearAll();
+    void clearAll() {};
 };
