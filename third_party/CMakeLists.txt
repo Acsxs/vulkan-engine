@@ -25,6 +25,9 @@ target_include_directories(vma INTERFACE vma)
 
 target_include_directories(glm INTERFACE glm)
 
+target_include_directories(stb_image INTERFACE stb_image)
+target_include_directories(stb_image INTERFACE stb_image_write)
+
 target_include_directories(tiny_gltf INTERFACE tiny_gltf)
 
 #add_library(sdl2 INTERFACE)
@@ -52,4 +55,3 @@ target_sources(imgui PRIVATE
 
 target_link_libraries(imgui PUBLIC Vulkan::Vulkan SDL2::SDL2)
 
-target_include_directories(stb_image INTERFACE stb_image)
