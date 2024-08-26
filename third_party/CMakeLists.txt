@@ -5,7 +5,7 @@ add_library(glm INTERFACE)
 add_library(vma INTERFACE)
 
 add_library(stb_image INTERFACE)
-add_library(tinygltf INTERFACE)
+add_library(tiny_gltf INTERFACE)
 
 add_subdirectory(fastgltf)
 add_subdirectory(fmt EXCLUDE_FROM_ALL)
@@ -24,6 +24,8 @@ set_property(TARGET vkbootstrap PROPERTY CXX_STANDARD 20)
 target_include_directories(vma INTERFACE vma)
 
 target_include_directories(glm INTERFACE glm)
+
+target_include_directories(tiny_gltf INTERFACE tiny_gltf)
 
 #add_library(sdl2 INTERFACE)
 
