@@ -1,4 +1,5 @@
 #include "vk_destructor.h"
+#include <iostream>
 
 void ResourceDestructor::destroy(VulkanDevice* vulkanDevice, VkFence* fence) {
 	if (fence != nullptr) {

@@ -56,11 +56,10 @@ AllocatedBuffer VulkanDevice::createBuffer(size_t allocSize, VkBufferUsageFlags 
 	VmaAllocationCreateInfo bufferAllocationCreateInfo = {};
 	bufferAllocationCreateInfo.usage = memoryUsage;
 	bufferAllocationCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-	AllocatedBuffer newBuffer;
+	AllocatedBuffer newBuffer = {};
 
 	// allocate the buffer
-	VK_CHECK(vmaCreateBuffer(_allocator, &bufferCreateInfo, &bufferAllocationCreateInfo, &newBuffer.buffer, &newBuffer.allocation,
-		&newBuffer.info));
+	VK_CHECK(vmaCreateBuffer(_allocator, &bufferCreateInfo, &bufferAllocationCreateInfo, &newBuffer.buffer, &newBuffer.allocation, &newBuffer.info));
 
 	return newBuffer;
 }

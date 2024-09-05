@@ -314,7 +314,7 @@ void VulkanEngine::drawBackground(VkCommandBuffer* commandBuffer)
 void VulkanEngine::drawGeometry(VkCommandBuffer* commandBuffer) {
 
 	//allocate a new uniform buffer for the scene data
-	AllocatedBuffer gpuSceneDataBuffer = _vulkanDevice.createBuffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+	AllocatedBuffer gpuSceneDataBuffer = _vulkanDevice.createBuffer(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU); // issue
 
 	//add it to the deletion queue of this frame so it gets deleted once its been used
 	getCurrentRenderData()._frameDestructor.buffers.push_back(&gpuSceneDataBuffer);
