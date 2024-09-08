@@ -1,5 +1,9 @@
 ﻿#define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+
+#define TINYGLTF_IMPLEMENTATION
+#include "tiny_gltf.h"
+
 #include <iostream>
 #include "vk_descriptors.h"
 
@@ -614,4 +618,27 @@ void LoadedGLTF::clearAll() {
     for (auto& sampler : samplers) {
         vkDestroySampler(dv, sampler, nullptr);
     }
+}
+
+bool loadModel(tinygltf::Model* model, std::string filePath) {
+    fmt::println ("Loading GLTF: {}", filePath);
+    
+    tinygltf::TinyGLTF tinyGLTF;
+
+    std::string err;
+    std::string warn;
+
+    bool res = tinyGLTF.LoadASCIIFromFile(model, &err, &warn, filePath);
+    if (!warn.empty()) {
+        std::cout << "WARN: " << warn << std::endl;
+    }
+
+    if (!err.empty()) {
+        std::cout << "ERR: " << err << std::endl;
+    }
+    if (!res)
+        std::cout << "Failed to load glTF: " << filePath << std::endl;
+    else
+        std::cout << "Loaded glTF: " << filePath << std::endl;
+    return res;
 }
