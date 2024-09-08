@@ -10,6 +10,7 @@ layout (location = 1) out vec2 outUV;
 layout (location = 2) out vec3 outViewVec;
 layout (location = 3) out mat3 TBN;
 
+
 struct Vertex {
 
 	vec3 position;
