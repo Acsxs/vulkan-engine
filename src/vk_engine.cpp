@@ -193,8 +193,8 @@ void VulkanEngine::draw()
 
 	VkSubmitInfo2 submitInfo = vkinit::SubmitInfo2(&commandBufferSubmitInfo, &signalInfo, &waitInfo);
 
-	VK_CHECK(vkQueueSubmit2(_vulkanDevice.getQueue(VulkanDevice::GRAPHICS), 1, &submitInfo, getCurrentRenderData()._renderFence));
-	
+	VK_CHECK(vkQueueSubmit2(_vulkanDevice._queues[VulkanDevice::GRAPHICS], 1, &submitInfo, getCurrentRenderData()._renderFence));
+
 	VkPresentInfoKHR presentInfo = vkinit::PresentInfoKHR();
 
 	presentInfo.pSwapchains = &_swapchain._swapchain;
@@ -205,7 +205,7 @@ void VulkanEngine::draw()
 
 	presentInfo.pImageIndices = &swapchainImageIndex;
 
-	VkResult presentResult = vkQueuePresentKHR(_vulkanDevice.getQueue(VulkanDevice::GRAPHICS), &presentInfo);
+	VkResult presentResult = vkQueuePresentKHR(_vulkanDevice._queues[VulkanDevice::GRAPHICS], & presentInfo);
 
 
 	//increase the number of frames drawn
@@ -530,7 +530,7 @@ void VulkanEngine::initImgui()
 	imguiInitInfo.Instance = _instance;
 	imguiInitInfo.PhysicalDevice = _vulkanDevice._physicalDevice;
 	imguiInitInfo.Device = _vulkanDevice._logicalDevice;
-	imguiInitInfo.Queue = _vulkanDevice.getQueue(VulkanDevice::GRAPHICS);
+	imguiInitInfo.Queue = _vulkanDevice._queues[VulkanDevice::GRAPHICS];
 	imguiInitInfo.DescriptorPool = imguiDescriptorPool;
 	imguiInitInfo.MinImageCount = 3;
 	imguiInitInfo.ImageCount = 3;

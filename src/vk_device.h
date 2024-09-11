@@ -24,7 +24,6 @@ public:
 	uint32_t _queueFamilies[3];
 	VkQueue _queues[3];
 
-	VkQueue getQueue(uint8_t queueIndex) { return _queues[queueIndex]; };
 	uint32_t getQueueFamilyIndex(uint8_t queueIndex) { return _queueFamilies[queueIndex]; };
 
 	AllocatedBuffer createBuffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);

@@ -145,7 +145,7 @@ void VulkanDevice::immediateSubmit(std::function<void(VkCommandBuffer* commandBu
 	VkCommandBufferSubmitInfo commandBufferSubmitInfo = vkinit::CommandBufferSubmitInfo(_immCommandBuffer);
 	VkSubmitInfo2 submitInfo = vkinit::SubmitInfo2(&commandBufferSubmitInfo, nullptr, nullptr);
 
-	VK_CHECK(vkQueueSubmit2(getQueue(GRAPHICS), 1, &submitInfo, _immFence));
+	VK_CHECK(vkQueueSubmit2(_queues[GRAPHICS], 1, &submitInfo, _immFence));
 
 	VK_CHECK(vkWaitForFences(_logicalDevice, 1, &_immFence, true, 9999999999));
 }
