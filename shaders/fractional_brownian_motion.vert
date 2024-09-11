@@ -31,15 +31,29 @@ layout( push_constant ) uniform constants
 {
 	mat4 renderMatrix;
 	VertexBuffer vertexBuffer;
+    int numWaves;
+    float time;
 } PushConstants;
 
+
+vec3 fractionalBrownianMotion(int numWaves, float phaseShiftX , float phaseShiftY, vec3 position){
+    vec3 pos = position;
+    float sine = 0;
+    for (int i=0; i<numWaves; i++){
+        sine += (1/i)*sin(i*(time+position.x+phaseShiftX));
+        sine += (1/i)*sin(i*(time+position.y+phaseShiftY));
+    }
+    pos.y += sine;
+    return pos
+}
 
 
 void main() 
 {
+
 	Vertex v = PushConstants.vertexBuffer.vertices[gl_VertexIndex];
 	
-	vec4 position = vec4(v.position, 1.0f);
+	vec4 position = vec4(fractionalBrownianMotion(numWaves,0.f,0.f,v.position), 1.0f);
 
 	vec4 renderPosition = PushConstants.renderMatrix * position;
 
