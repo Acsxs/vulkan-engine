@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+
 #include <vk_types.h>
 #include <unordered_map>
 #include <filesystem>
@@ -54,4 +55,4 @@ private:
 
 std::optional<std::vector<std::shared_ptr<MeshAsset>>> loadGLTFMeshes(VulkanEngine* engine, std::filesystem::path filePath);
 std::optional<std::shared_ptr<LoadedGLTF>> loadGltf(VulkanEngine* engine, std::string_view filePath);
-tinygltf::Model loadGLTF(VulkanEngine* engine, std::string_view filepath);
+//tinygltf::Model loadGLTF(VulkanEngine* engine, std::string_view filepath);
