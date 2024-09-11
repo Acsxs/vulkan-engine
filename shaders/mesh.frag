@@ -3,7 +3,8 @@
 #include "input_structures.glsl"
 
 #define PI 3.1415926538
-
+#define MEDIUMP_FLT_MAX    65504.0
+#define saturateMediump(x) min(x, MEDIUMP_FLT_MAX)
 
 layout (location = 0) in vec4 inColor;
 layout (location = 1) in vec2 inUV;
@@ -19,31 +20,12 @@ vec4 map(vec4 value, float min1, float max1, float min2, float max2) {
   return min2 + (value - min1) * (max2 - min2) / (max1 - min1);
 }
 
-vec4 getDiffuse(vec3 normal, vec4 lightIn, vec4 albedo) {
-	return albedo * dot(vec4(normal,1.f), lightIn);
-}
-
-vec4 getSpecular(vec3 normal, vec4 lightIn, vec4 lightOut, vec4 specularGlossiness) {
-	vec3 halfVector = normalize(lightIn.xyz+lightOut.xyz);
-	float specularStrength = dot(halfVector, normal);
-	return vec4(specularStrength, specularStrength, specularStrength, 1.f);
-}
-
-vec4 getBRDF(vec3 normal, vec4 lightIn, vec4 lightOut, vec4 albedo, vec4 specularGlossiness){
-	// vec3 halfVector = normalize(lightIn+lightOut);
-	
-	vec4 diffuse = getDiffuse(normal, lightIn, albedo);
-	// vec4 specular = 
-	return diffuse;
-	// vec3 specular =
-}
-
 float D_GGX(float roughness, float NoH, const vec3 n, const vec3 h) {
     vec3 NxH = cross(n, h);
     float a = NoH * roughness;
     float k = roughness / (dot(NxH, NxH) + a * a);
     float d = k * k * (1.0 / PI);
-    return d;
+    return saturateMediump(d);
 }
 
 float V_SmithGGXCorrelatedFast(float NoV, float NoL, float roughness) {
@@ -61,11 +43,37 @@ vec3 F_Schlick(float u, vec3 f0) {
     return f + f0 * (1.0 - f);
 }
 
+vec4 getSpecular(vec3 normal, vec3 lightIn, vec3 lightOut, vec4 specularGlossiness) {
+	vec3 halfVector = normalize(lightIn+lightOut);
+	float NoH = dot(normal, halfVector);
+	float NoV = dot(normal, lightOut);
+	float NoL = dot(normal, lightIn);
+	float roughness = 1-specularGlossiness[1];
+	float u = dot(lightIn, lightOut);
+	vec3 f0 = vec3(specularGlossiness[0], specularGlossiness[0], specularGlossiness[0]);
+	vec3 specular = D_GGX(roughness, NoH, normal, halfVector) * V_SmithGGXCorrelatedFast(NoV,NoL,roughness) * F_Schlick(u, f0);
+	specular = specular/(4*NoV*NoL);
+
+	return vec4(specular,1.f);
+}
+
+vec4 getDiffuse(vec3 normal, vec3 lightIn, vec4 albedo) {
+	return albedo * dot(normal, lightIn);
+}
+
+vec4 getBRDF(vec3 normal, vec3 lightIn, vec3 lightOut, vec4 albedo, vec4 specularGlossiness){
+	// vec3 halfVector = normalize(lightIn+lightOut);
+	
+	vec4 diffuse = getDiffuse(normal, lightIn, albedo);
+	vec4 specular = getSpecular(normal, lightIn, lightOut, specularGlossiness);
+	return diffuse+specular;
+	// vec3 specular =
+}
+
 void main() 
 {
-	vec4 toSun = vec4(sceneData.sunlightDirection.xyz,1.f);
-	vec4 toView = vec4(inViewVec,1.f);
-	vec4 halfVector = normalize(toSun+toView);
+	vec3 toSun = sceneData.sunlightDirection.xyz;
+	vec3 toView = inViewVec;
 
 	vec4 color = inColor * texture(colorTex,inUV);
 	vec4 occGlossSpec = materialData.specGlossFactors * texture(specGlossTex, inUV);

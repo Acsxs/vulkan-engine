@@ -1,4 +1,5 @@
-﻿#define STB_IMAGE_IMPLEMENTATION
+﻿
+#define STB_IMAGE_IMPLEMENTATION 
 #include "stb_image.h"
 
 //#define TINYGLTF_IMPLEMENTATION
@@ -619,7 +620,7 @@ void LoadedGLTF::clearAll() {
         vkDestroySampler(dv, sampler, nullptr);
     }
 }
-//
+
 //bool loadModel(tinygltf::Model* model, std::string filePath) {
 //    fmt::println ("Loading GLTF: {}", filePath);
 //    
