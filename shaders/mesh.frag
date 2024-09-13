@@ -43,17 +43,15 @@ vec3 F_Schlick(float u, vec3 f0) {
     return f + f0 * (1.0 - f);
 }
 
-vec4 getSpecular(vec3 normal, vec3 lightIn, vec3 lightOut, vec4 specularGlossiness) {
+vec4 getSpecular(vec3 normal, vec3 lightIn, vec3 lightOut, vec4 lightColour, vec4 specularGlossiness) {
 	vec3 halfVector = normalize(lightIn+lightOut);
-	float NoH = dot(normal, halfVector);
-	float NoV = dot(normal, lightOut);
-	float NoL = dot(normal, lightIn);
+	float NoH = clamp(dot(normal, halfVector), 0.0, 1.0);
+	float NoV = abs(dot(normal, lightOut)) + 1e-5;
+	float NoL = clamp(dot(normal, lightIn), 0.0, 1.0);
 	float roughness = 1-specularGlossiness[1];
-	float u = dot(lightIn, lightOut);
-	vec3 f0 = vec3(specularGlossiness[0], specularGlossiness[0], specularGlossiness[0]);
-	vec3 specular = D_GGX(roughness, NoH, normal, halfVector) * V_SmithGGXCorrelatedFast(NoV,NoL,roughness) * F_Schlick(u, f0);
-	specular = specular/(4*NoV*NoL);
-
+	float u = clamp(dot(lightIn, halfVector),0.0,1.0);
+	vec3 f0 = lightColour.xyz;
+	vec3 specular = (D_GGX(roughness, NoH, normal, halfVector) * V_SmithGGXCorrelatedFast(NoV,NoL,roughness)) * F_Schlick(u, f0);
 	return vec4(specular,1.f);
 }
 
@@ -61,12 +59,12 @@ vec4 getDiffuse(vec3 normal, vec3 lightIn, vec4 albedo) {
 	return albedo * dot(normal, lightIn);
 }
 
-vec4 getBRDF(vec3 normal, vec3 lightIn, vec3 lightOut, vec4 albedo, vec4 specularGlossiness){
+vec4 getBRDF(vec3 normal, vec3 lightIn, vec3 lightOut, vec4 albedo, vec4 lightColour,vec4 specularGlossiness){
 	// vec3 halfVector = normalize(lightIn+lightOut);
 	
 	vec4 diffuse = getDiffuse(normal, lightIn, albedo);
-	vec4 specular = getSpecular(normal, lightIn, lightOut, specularGlossiness);
-	return diffuse+specular;
+	vec4 specular = getSpecular(normal, lightIn, lightOut, lightColour, specularGlossiness);
+	return diffuse*specular;
 	// vec3 specular =
 }
 
@@ -85,7 +83,7 @@ void main()
 	vec4 ambient = color * sceneData.ambientColor;
 
 	// outFragColor = vec4(normal,1.f);
-	outFragColor = getBRDF(normal, toSun, toView, color, occGlossSpec) * dot(normal, toSun.xyz) * sceneData.sunlightColor + ambient;
+	outFragColor = getBRDF(normal, toSun, toView, color,sceneData.sunlightColor, occGlossSpec) * dot(normal, toSun.xyz) * sceneData.sunlightColor + ambient;
 	// outFragColor = getSpecular(inNormal, toSun, toView, occGlossSpec);
 
 	// vec3 albedo = color * diffuseStrength * sceneData.sunlightColor.w;

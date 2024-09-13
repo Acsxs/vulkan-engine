@@ -384,7 +384,7 @@ void VulkanEngine::updateScene()
 	loadedNodes["Suzanne"]->draw(glm::mat4{ 1.f }, mainDrawContext);
 	loadedScenes["structure"]->draw(glm::mat4{ 1.f }, mainDrawContext);
 	//loadedScenes["flower"]->draw(glm::mat4(1.f), mainDrawContext);
-	loadedScenes["plane"]->draw(glm::mat4{ 1.f }, mainDrawContext);
+	//loadedScenes["plane"]->draw(glm::mat4{ 1.f }, mainDrawContext); 
 
 	mainCamera.update();
 
@@ -834,11 +834,11 @@ void VulkanEngine::initDefaultData() {
 	assert(flowerFile.has_value());
 	loadedScenes["flower"] = *flowerFile;
 
-	std::string planePath = { "..\\..\\assets\\plane.glb" };
+	/*std::string planePath = { "..\\..\\assets\\plane.glb" };
 	auto planeFile = loadGltf(this, planePath);
 
 	assert(planeFile.has_value());
-	loadedScenes["plane"] = *planeFile;
+	loadedScenes["plane"] = *planeFile;*/
 }
 
 void VulkanEngine::initPipelines()
