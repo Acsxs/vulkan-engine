@@ -120,6 +120,7 @@ public:
 	int _frameNumber {0};
 	bool stop_rendering{false};
 	VkExtent2D _windowExtent{ 1920 , 1080 };
+	std::chrono::system_clock::time_point start_time;
 
 	struct SDL_Window* _window{ nullptr };
 

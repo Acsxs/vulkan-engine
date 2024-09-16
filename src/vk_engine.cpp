@@ -66,6 +66,9 @@ void VulkanEngine::init()
 	mainCamera.pitch = 0;
 	mainCamera.yaw = 0;
 
+	start_time = std::chrono::system_clock::now();
+	// std::chrono::duration_cast<std::chrono::microseconds>(end - start)
+
 	//everything went fine
 	_isInitialized = true;
 }
