@@ -41,6 +41,11 @@ struct GLTFSpecularRoughness {
 	MaterialInstance writeMaterial(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
 };
 
+struct Wave: GLTFSpecularRoughness{
+	void buildPipelines(VulkanEngine* engine);
+	MaterialInstance writeMaterial(VkDevice device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
+};
+
 struct MeshNode : public Node {
 
 	std::shared_ptr<MeshAsset> mesh;
@@ -196,6 +201,7 @@ public:
 
 	MaterialInstance defaultData;
 	GLTFSpecularRoughness specularRoughnessMaterial;
+
 
 	Camera mainCamera;
 
