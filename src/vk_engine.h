@@ -12,35 +12,34 @@
 #include "camera.h"
 
 
-struct GLTFMetallicRoughness {
-	MaterialPipeline opaquePipeline;
-	MaterialPipeline transparentPipeline;
 
+struct SpecularMaterial {
 	VkDescriptorSetLayout materialLayout;
+	DescriptorWriter writer;
 
+	VulkanPipeline opaquePipeline;
+	VulkanPipeline transparentPipeline;
+
+	struct MaterialResources {
+		AllocatedImage albedoImage;
+		VkSampler albedoSampler;
+		AllocatedImage specularGlossinessImage;
+		VkSampler specularGlossinessSampler;
+		VkBuffer dataBuffer;
+		uint32_t dataBufferOffset;
+	};
 	struct MaterialConstants {
-		glm::vec4 colorFactors;
-		glm::vec4 metallicRoughnessFactors;
+		glm::vec4 albedoFactors;
+		glm::vec4 specularGlossinessFactors;
 		//padding, we need it anyway for uniform buffers
 		glm::vec4 extra[14];
 	};
 
-	struct MaterialResources {
-		AllocatedImage colorImage;
-		VkSampler colorSampler;
-		AllocatedImage metalRoughImage;
-		VkSampler metalRoughSampler;
-		VkBuffer dataBuffer;
-		uint32_t dataBufferOffset;
-	};
-
-	DescriptorWriter writer;
-
 	void buildPipelines(VulkanEngine* engine);
 	void destroyPipelines(VulkanDevice* device);
-	void clearResources(VulkanDevice* device);
 
-	MaterialInstance writeMaterial(VulkanDevice* device, MaterialPass pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
+	void clearResources(VulkanDevice* device);
+	MaterialInstance writeMaterial(VulkanDevice* device, PassType pass, const SpecularMaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
 };
 
 struct MeshNode : public Node {

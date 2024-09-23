@@ -54,21 +54,24 @@ struct GPUSceneData {
 };
 
 
-struct MaterialPipeline {
+struct VulkanPipeline {
     VkPipeline pipeline;
     VkPipelineLayout layout;
 };
 
 struct MaterialInstance {
-    MaterialPipeline* pipeline;
+    VulkanPipeline* pipeline;
     VkDescriptorSet materialSet;
 };
 
-struct DrawContext;
+enum class PassType :uint8_t {
+    MainColor,
+    Transparent,
+    Other
+};
 
 // base class for a renderable dynamic object
 class IRenderable {
-
     virtual void draw(const glm::mat4& topMatrix, DrawContext& ctx) = 0;
 };
 
@@ -100,5 +103,3 @@ struct Node : public IRenderable {
         }
     }
 };
-
-
