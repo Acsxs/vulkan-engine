@@ -10,6 +10,16 @@ void Camera::update()
 
 void Camera::processSDLEvent(SDL_Event& e)
 {
+    if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
+        if (relMouse == false) {
+            SDL_SetRelativeMouseMode(SDL_TRUE);
+            relMouse = true;
+        }
+        else if (relMouse == true) {
+            SDL_SetRelativeMouseMode(SDL_FALSE);
+            relMouse = false;
+        }
+    }
     if (e.type == SDL_KEYDOWN) {
         if (e.key.keysym.sym == SDLK_w) { velocity.z = -moveSpeed; }
         if (e.key.keysym.sym == SDLK_s) { velocity.z = moveSpeed; }

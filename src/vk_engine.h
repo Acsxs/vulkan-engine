@@ -12,37 +12,9 @@
 #include "camera.h"
 
 
+
 constexpr unsigned int FRAMES_IN_FLIGHT = 3;
 
-//
-//struct SpecularMaterial {
-//	VkDescriptorSetLayout materialLayout;
-//	DescriptorWriter writer;
-//
-//	VulkanPipeline opaquePipeline;
-//	VulkanPipeline transparentPipeline;
-//
-//	struct MaterialResources {
-//		AllocatedImage albedoImage;
-//		VkSampler albedoSampler;
-//		AllocatedImage specularGlossinessImage;
-//		VkSampler specularGlossinessSampler;
-//		VkBuffer dataBuffer;
-//		uint32_t dataBufferOffset;
-//	};
-//	struct MaterialConstants {
-//		glm::vec4 albedoFactors;
-//		glm::vec4 specularGlossinessFactors;
-//		//padding, we need it anyway for uniform buffers
-//		glm::vec4 extra[14];
-//	};
-//
-//	void buildPipelines(VulkanEngine* engine);
-//	void destroyPipelines(VulkanDevice* device);
-//
-//	void clearResources(VulkanDevice* device);
-//	MaterialInstance writeMaterialReference(VulkanDevice* device, PassType pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
-//};
 //
 //struct MeshNode : public Node {
 //
@@ -210,7 +182,6 @@ constexpr unsigned int FRAMES_IN_FLIGHT = 3;
 
 
 
-
 struct FrameData {
 	VkSemaphore _swapchainSemaphore, _renderSemaphore;
 	VkFence _renderFence;
@@ -229,11 +200,11 @@ public:
 	uint64_t frameCount;
 	std::chrono::system_clock::time_point startTime;
 	std::chrono::system_clock::time_point previousFrameEnd;
-	float delta_time;
-	bool rendered;
+	float deltaTime;
+	bool rendering{ false };
 
-	VkExtent2D _windowExtent{ 1920 , 1080 };
-	struct SDL_Window* _window{ nullptr };
+	VkExtent2D windowExtent{ 1920 , 1080 };
+	struct SDL_Window* window{ nullptr };
 
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debug_messenger;
@@ -243,6 +214,8 @@ public:
 	VkSurfaceKHR surface;
 
 	FrameData frames[FRAMES_IN_FLIGHT];
+
+	Camera camera;
 
 	VkDescriptorPool imguiDescriptorPool;
 
@@ -264,7 +237,7 @@ public:
 	VkSampler defaultSamplerLinear;
 	VkSampler defaultSamplerNearest;
 
-	VkPipeline	
+	VulkanPipeline defaultPipeline;
 
 	void init();
 	void run();
@@ -276,6 +249,6 @@ private:
 	void initImgui();
 	void initPipelines();
 	void initDescriptors();
-	void initDefaultData();
+	void initDummyData();
 
 };

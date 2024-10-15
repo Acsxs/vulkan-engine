@@ -2,54 +2,46 @@
 #include "vk_types.h"
 #include "vk_device.h"
 
+struct PipelineInfo {
+    enum BlendState {
+        NONE,
+        ADDITIVE,
+        ALPHA
+    };
+    VkShaderModule vertexShader;
+    VkShaderModule fragmentShader;
+    VkPrimitiveTopology topology;
+    VkPolygonMode mode;
+    VkCullModeFlags cullMode;
+    VkFrontFace frontFace;
+    BlendState blending;
+    VkFormat colourAttachmentFormat;
+    VkFormat depthFormat;
+    bool depthWriteEnable;
+    VkCompareOp depthCompareOperation;
+    VkPipelineLayout pipelineLayout;
+    VkDescriptorSetLayout* layouts;
+    VkPushConstantRange* pushConstantRanges
+};
+
 namespace vkutil {
 
 	bool loadShaderModule(const char* filePath, VkDevice device, VkShaderModule* outShaderModule);
+    VkPipeline buildPipeline(VulkanDevice* device, PipelineInfo info);
 };
 
-class VulkanPipeline {
-public:
-    void destroy(VulkanDevice* device) {};
-private:
+struct VulkanPipeline {
+    VkPipeline pipeline;
+    VkPipelineLayout pipelineLayout;
 
+    void init(VulkanDevice* device, PipelineInfo info);
+    void destroy(VulkanDevice* device) { vkDestroyPipeline(device->_logicalDevice, pipeline, nullptr); vkDestroyPipelineLayout(device->_logicalDevice, pipelineLayout, nullptr); };
 };
 
-class PipelineBuilder {
-public:
-    std::vector<VkPipelineShaderStageCreateInfo> _shaderStages;
 
-    VkPipelineInputAssemblyStateCreateInfo _inputAssembly;
-    VkPipelineRasterizationStateCreateInfo _rasterizer;
-    VkPipelineColorBlendAttachmentState _colorBlendAttachment;
-    VkPipelineMultisampleStateCreateInfo _multisampling;
-    VkPipelineLayout _pipelineLayout;
-    VkPipelineDepthStencilStateCreateInfo _depthStencil;
-    VkPipelineRenderingCreateInfo _renderInfo;
-    VkFormat _colorAttachmentformat;
-
-    PipelineBuilder() { clear(); }
-
-    void clear();
-
-    VkPipeline buildPipeline(VkDevice device);
-
-    void setShaders(VkShaderModule vertexShader, VkShaderModule fragmentShader);
-
-    void setInputTopology(VkPrimitiveTopology topology);
-
-    void setPolygonMode(VkPolygonMode mode);
-
-    void setCullMode(VkCullModeFlags cullMode, VkFrontFace frontFace);
-
-    void setMultisamplingNone();
-
-    void disableBlending();
-    void enableBlendingAdditive();
-    void enableBlendingAlphaBlend();
-
-    void setColorAttachmentFormat(VkFormat format);
-    void setDepthFormat(VkFormat format);
-    
-    void disableDepthtest();
-    void enableDepthtest(bool depthWriteEnable, VkCompareOp op);
+struct MaterialPipeline {
+    VulkanPipeline opaquePipeline;
+    VulkanPipeline transparentPipeline;
+    void init (VulkanDevice* device, VkFormat drawFormat, VkFormat depthFormat, VkDescriptorSetLayout* layouts, VkPushConstantRange* pushConstantRanges);
+    void destroy(VulkanDevice* device) { opaquePipeline.destroy(device); transparentPipeline.destroy(device); };
 };

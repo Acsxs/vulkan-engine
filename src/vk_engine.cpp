@@ -462,7 +462,7 @@ using namespace std;
 //
 //	_vulkanDevice.init(vkbPhysicalDevice, _instance);
 //}
-//
+
 //void VulkanEngine::initSwapchain()
 //{
 //	_swapchain.createSwapchain(&_vulkanDevice, _surface, _windowExtent.width, _windowExtent.height);
@@ -493,11 +493,11 @@ using namespace std;
 //	_mainDestructor.images.push_back(&_drawImage);
 //	_mainDestructor.images.push_back(&_depthImage);
 //}
-//
+
 //void VulkanEngine::initCommands() {}
 //
 //void VulkanEngine::initSyncStructures() {}
-//
+
 //void VulkanEngine::initImgui()
 //{
 //	//  the size of the pool is very oversize, but it's copied from imgui demo itself.
@@ -547,7 +547,7 @@ using namespace std;
 //
 //	ImGui_ImplVulkan_CreateFontsTexture();
 //}
-//
+
 //void VulkanEngine::initDefaultData() {
 //
 //	//3 default textures, white, grey, black. 1 pixel each
@@ -845,13 +845,7 @@ using namespace std;
 //	return newSurface;
 //
 //}
-//
-//
-//
-//
-//
-//
-//
+
 //void SpecularMaterial::buildPipelines(VulkanEngine* engine)
 //{
 //	VkShaderModule meshFragShader;
@@ -958,13 +952,7 @@ using namespace std;
 //
 //	return matData;
 //}
-//
-//
-//
-//
-//
-//
-//
+
 //void MeshNode::draw(const glm::mat4& topMatrix, DrawContext& ctx)
 //{
 //	glm::mat4 nodeMatrix = topMatrix * worldTransform;
@@ -986,3 +974,230 @@ using namespace std;
 //	Node::draw(topMatrix, ctx);
 //}
 
+
+
+
+
+void VulkanEngine::init() {
+	SDL_Init(SDL_INIT_VIDEO);
+	SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
+	
+	window = SDL_CreateWindow(
+		"Vulkan Engine",
+		SDL_WINDOWPOS_UNDEFINED,
+		SDL_WINDOWPOS_UNDEFINED,
+		windowExtent.width,
+		windowExtent.height,
+		window_flags
+	);
+	
+	SDL_SetRelativeMouseMode(SDL_TRUE);
+	camera.relMouse = true;
+	
+	initVulkan();
+	initSwapchain();
+	initDescriptors();
+	initPipelines();
+	initImgui();
+	initDummyData();
+	
+	for (int i = 0; i < FRAMES_IN_FLIGHT; i++) {
+		frames[i].init(&vulkanDevice);
+	}
+	
+	camera.velocity = glm::vec3(0.f);
+	camera.position = glm::vec3(0, 0, 5);
+	
+	camera.pitch = 0;
+	camera.yaw = 0;
+}
+
+void VulkanEngine::run() {
+	SDL_Event e;
+	bool bQuit = false;
+	//main loop
+	while (!bQuit)
+	{
+		//Handle events on queue
+		while (SDL_PollEvent(&e) != 0) {
+			//close the window when user alt-f4s or clicks the X button			
+			if (e.type == SDL_QUIT) bQuit = true;
+	
+			if (e.type == SDL_WINDOWEVENT) {
+	
+				if (e.window.event == SDL_WINDOWEVENT_MINIMIZED) {
+					rendering = false;
+				}
+				if (e.window.event == SDL_WINDOWEVENT_RESTORED) {
+					rendering = true;
+				}
+			}
+	
+			camera.processSDLEvent(e);
+			//send SDL event to imgui for handling
+			ImGui_ImplSDL2_ProcessEvent(&e);
+		}
+	
+		//do not draw if we are minimized
+		if (!rendering) {
+			//throttle the speed to avoid the endless spinning
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			continue;
+		}
+	
+		// imgui new frame
+		ImGui_ImplVulkan_NewFrame();
+		ImGui_ImplSDL2_NewFrame();
+	
+		// imgui input sensitivity
+		ImGui::NewFrame();
+	
+		if (ImGui::Begin("input sensitivity")) {
+	
+	
+			ImGui::SliderFloat("movespeed", &camera.moveSpeed, 0, 2);
+			ImGui::SliderFloat("mouse sense", &camera.mouseSense, 0, 2);
+	
+			ImGui::End();
+		}
+		ImGui::Render();
+	
+		draw();
+	}
+}
+
+void VulkanEngine::draw() {
+
+}
+
+void VulkanEngine::destroy() {
+
+}
+
+
+
+void VulkanEngine::initVulkan() {
+	vkb::InstanceBuilder vkbInstanceBuilder;
+
+	vkb::Instance vkbInstance = vkbInstanceBuilder
+		.set_app_name("Waves")
+		.request_validation_layers(bUseValidationLayers)
+		.use_default_debug_messenger()
+		.require_api_version(1, 3, 0)
+		.build()
+		.value();
+
+	instance = vkbInstance.instance;
+	debug_messenger = vkbInstance.debug_messenger;
+
+	SDL_Vulkan_CreateSurface(window, instance, &surface);
+
+	VkPhysicalDeviceVulkan13Features physicalDeviceFeatures13{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES };
+	physicalDeviceFeatures13.dynamicRendering = true;
+	physicalDeviceFeatures13.synchronization2 = true;
+
+	VkPhysicalDeviceVulkan12Features physicalDeviceFeatures12{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
+	physicalDeviceFeatures12.bufferDeviceAddress = true;
+	physicalDeviceFeatures12.descriptorIndexing = true;
+
+	vkb::PhysicalDeviceSelector vkbPhysicalDeviceSelector{ vkbInstance };
+	vkb::PhysicalDevice vkbPhysicalDevice = vkbPhysicalDeviceSelector
+		.set_minimum_version(1, 3)
+		.set_required_features_13(physicalDeviceFeatures13)
+		.set_required_features_12(physicalDeviceFeatures12)
+		.set_surface(surface)
+		.select()
+		.value();
+
+	vulkanDevice.init(vkbPhysicalDevice, instance);
+}
+
+void VulkanEngine::initSwapchain() {
+	swapchain.createSwapchain(&vulkanDevice, surface, windowExtent.width, windowExtent.height);
+	VkExtent3D drawImageExtent = {
+		windowExtent.width,
+		windowExtent.height,
+		1
+	};
+		
+	VkImageUsageFlags drawImageUsages{};
+	drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+	drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	drawImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
+	drawImageUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+		
+	VkImageCreateInfo renderImageCreateInfo = vkinit::ImageCreateInfo(drawImage.imageFormat, drawImageUsages, drawImageExtent);
+		
+	VmaAllocationCreateInfo renderImageAllocationCreateInfo = {};
+	renderImageAllocationCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
+	renderImageAllocationCreateInfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+	drawImage = vulkanDevice.createImage(drawImageExtent, VK_FORMAT_R16G16B16A16_SFLOAT, drawImageUsages, VK_IMAGE_ASPECT_COLOR_BIT);
+		
+	VkImageUsageFlags depthImageUsages{};
+	depthImageUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+		
+	depthImage = vulkanDevice.createImage(drawImageExtent, VK_FORMAT_D32_SFLOAT, depthImageUsages, VK_IMAGE_ASPECT_DEPTH_BIT);
+	mainDestructor.images.push_back(&drawImage);
+	mainDestructor.images.push_back(&depthImage);
+	
+
+}
+
+void VulkanEngine::initImgui() {
+	//the size of the pool is very oversize, but it's copied from imgui demo itself.
+	VkDescriptorPoolSize descriptorPoolSizes[] = { { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+		{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 } };
+
+	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
+	descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	descriptorPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+	descriptorPoolCreateInfo.maxSets = 1000;
+	descriptorPoolCreateInfo.poolSizeCount = (uint32_t)std::size(descriptorPoolSizes);
+	descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes;
+
+	VK_CHECK(vkCreateDescriptorPool(vulkanDevice._logicalDevice, &descriptorPoolCreateInfo, nullptr, &imguiDescriptorPool));
+
+	ImGui::CreateContext();
+
+	ImGui_ImplSDL2_InitForVulkan(window);
+
+	ImGui_ImplVulkan_InitInfo imguiInitInfo = {};
+	imguiInitInfo.Instance = instance;
+	imguiInitInfo.PhysicalDevice = vulkanDevice._physicalDevice;
+	imguiInitInfo.Device = vulkanDevice._logicalDevice;
+	imguiInitInfo.Queue = vulkanDevice._queues[VulkanDevice::GRAPHICS];
+	imguiInitInfo.DescriptorPool = imguiDescriptorPool;
+	imguiInitInfo.MinImageCount = 3;
+	imguiInitInfo.ImageCount = 3;
+	imguiInitInfo.UseDynamicRendering = true;
+
+	imguiInitInfo.PipelineRenderingCreateInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
+	imguiInitInfo.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+	imguiInitInfo.PipelineRenderingCreateInfo.pColorAttachmentFormats = &swapchain._swapchainImageFormat;
+
+
+	imguiInitInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+
+	ImGui_ImplVulkan_Init(&imguiInitInfo);
+
+	ImGui_ImplVulkan_CreateFontsTexture();
+}
+
+void VulkanEngine::initPipelines() {
+
+}
+void VulkanEngine::initDescriptors() {
+
+}
+void VulkanEngine::initDummyData() {
+
+}
