@@ -13,8 +13,6 @@
 
 
 
-constexpr unsigned int FRAMES_IN_FLIGHT = 3;
-
 //
 //struct MeshNode : public Node {
 //
@@ -213,7 +211,7 @@ public:
 	VulkanSwapchain swapchain;
 	VkSurfaceKHR surface;
 
-	FrameData frames[FRAMES_IN_FLIGHT];
+	FrameData framesData[FRAMES_IN_FLIGHT];
 
 	Camera camera;
 

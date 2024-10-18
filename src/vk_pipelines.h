@@ -19,29 +19,29 @@ struct PipelineInfo {
     VkFormat depthFormat;
     bool depthWriteEnable;
     VkCompareOp depthCompareOperation;
-    VkPipelineLayout pipelineLayout;
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo;
     VkDescriptorSetLayout* layouts;
-    VkPushConstantRange* pushConstantRanges
+    VkPushConstantRange* pushConstantRanges;
 };
 
 namespace vkutil {
 
 	bool loadShaderModule(const char* filePath, VkDevice device, VkShaderModule* outShaderModule);
-    VkPipeline buildPipeline(VulkanDevice* device, PipelineInfo info);
+    VkPipeline buildPipeline(VulkanDevice* device, VkPipelineLayout layout, PipelineInfo info);
 };
 
 struct VulkanPipeline {
     VkPipeline pipeline;
     VkPipelineLayout pipelineLayout;
 
-    void init(VulkanDevice* device, PipelineInfo info);
+    void init(VulkanDevice* device,  PipelineInfo info);
     void destroy(VulkanDevice* device) { vkDestroyPipeline(device->_logicalDevice, pipeline, nullptr); vkDestroyPipelineLayout(device->_logicalDevice, pipelineLayout, nullptr); };
 };
 
 
-struct MaterialPipeline {
+struct MaterialPipelines {
     VulkanPipeline opaquePipeline;
     VulkanPipeline transparentPipeline;
-    void init (VulkanDevice* device, VkFormat drawFormat, VkFormat depthFormat, VkDescriptorSetLayout* layouts, VkPushConstantRange* pushConstantRanges);
+    void init (VulkanDevice* device, VkFormat drawFormat, VkFormat depthFormat, VkPipelineLayoutCreateInfo layout);
     void destroy(VulkanDevice* device) { opaquePipeline.destroy(device); transparentPipeline.destroy(device); };
 };

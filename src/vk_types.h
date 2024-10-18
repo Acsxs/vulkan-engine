@@ -22,6 +22,8 @@
 
 #define VK_CHECK(x) do { VkResult err = x; if (err) {fmt::println("Detected Vulkan error: {}", string_VkResult(err)); abort(); } } while (0)
 
+constexpr unsigned int FRAMES_IN_FLIGHT = 3;
+
 
 
 struct Vertex {
@@ -54,21 +56,6 @@ struct GPUSceneData {
 };
 
 
-struct VulkanPipeline {
-    VkPipeline pipeline;
-    VkPipelineLayout layout;
-};
-
-struct MaterialInstance {
-    VulkanPipeline* pipeline;
-    VkDescriptorSet materialSet;
-};
-
-enum class PassType :uint8_t {
-    MainColor,
-    Transparent,
-    Other
-};
 
 // base class for a renderable dynamic object
 class IRenderable {

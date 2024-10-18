@@ -47,7 +47,7 @@ bool vkutil::loadShaderModule(const char* filePath, VkDevice device, VkShaderMod
     return true;
 }
 
-VkPipeline vkutil::buildPipeline(VulkanDevice* device, PipelineInfo info) {
+VkPipeline vkutil::buildPipeline(VulkanDevice* device, VkPipelineLayout layout, PipelineInfo info) {
 
     std::vector<VkPipelineShaderStageCreateInfo> shaderStages;
     shaderStages.push_back(vkinit::PipelineShaderStageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT, info.vertexShader));
@@ -157,7 +157,7 @@ VkPipeline vkutil::buildPipeline(VulkanDevice* device, PipelineInfo info) {
     graphicsPipelineCreateInfo.pMultisampleState = &multisampling;
     graphicsPipelineCreateInfo.pColorBlendState = &colorBlending;
     graphicsPipelineCreateInfo.pDepthStencilState = &depthStencil;
-    graphicsPipelineCreateInfo.layout = info.pipelineLayout;
+    graphicsPipelineCreateInfo.layout = layout;
     graphicsPipelineCreateInfo.pDynamicState = &dynamicInfo;
 
     VkPipeline newPipeline;
@@ -171,12 +171,12 @@ VkPipeline vkutil::buildPipeline(VulkanDevice* device, PipelineInfo info) {
 };
 
 void VulkanPipeline::init(VulkanDevice* device, PipelineInfo info) {
-    pipelineLayout = info.layouts;
-    pipeline = vkutil::buildPipeline(device, info);
+    VK_CHECK(vkCreatePipelineLayout(device->_logicalDevice, &info.pipelineLayoutInfo, nullptr, &pipelineLayout));
+    pipeline = vkutil::buildPipeline(device, pipelineLayout, info);
 }
 
 
-void MaterialPipeline::init(VulkanDevice* device, VkFormat drawFormat, VkFormat depthFormat, VkDescriptorSetLayout* layouts, VkPushConstantRange* pushConstantRanges) {
+void MaterialPipelines::init(VulkanDevice* device, VkFormat drawFormat, VkFormat depthFormat, VkPipelineLayoutCreateInfo layout) {
     VkShaderModule meshFragShader;
     if (vkutil::loadShaderModule("../../shaders/mesh.frag.spv", device->_logicalDevice, &meshFragShader)) {
         fmt::println("Mesh fragment shader module loaded successfully");
@@ -192,16 +192,6 @@ void MaterialPipeline::init(VulkanDevice* device, VkFormat drawFormat, VkFormat 
         fmt::println("Error when building the mesh vertex shader module");
     }
 
-    VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::PipelineLayoutCreateInfo();
-    mesh_layout_info.setLayoutCount = 2;
-    mesh_layout_info.pSetLayouts = layouts;
-    mesh_layout_info.pPushConstantRanges = pushConstantRanges;
-    mesh_layout_info.pushConstantRangeCount = 1;
-
-    VkPipelineLayout newLayout;
-    VK_CHECK(vkCreatePipelineLayout(device->_logicalDevice, &mesh_layout_info, nullptr, &newLayout));
-
-
     PipelineInfo pipelineInfo = {};
 
     pipelineInfo.vertexShader = meshVertexShader;
@@ -215,7 +205,7 @@ void MaterialPipeline::init(VulkanDevice* device, VkFormat drawFormat, VkFormat 
     pipelineInfo.depthFormat = depthFormat;
     pipelineInfo.depthWriteEnable = true;
     pipelineInfo.depthCompareOperation = VK_COMPARE_OP_GREATER_OR_EQUAL;
-    pipelineInfo.pipelineLayout = newLayout;
+    pipelineInfo.pipelineLayoutInfo = layout;
 
     opaquePipeline.init(device, pipelineInfo);
 
