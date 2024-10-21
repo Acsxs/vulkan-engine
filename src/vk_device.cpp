@@ -1,5 +1,11 @@
 #include "vk_device.h"
 
+
+#define VMA_IMPLEMENTATION
+#include <vk_mem_alloc.h>
+#include <iostream>
+
+
 void VulkanDevice::init(vkb::PhysicalDevice vkbPhysicalDevice, VkInstance instance) {
 
 	vkb::DeviceBuilder vkbDeviceBuilder{ vkbPhysicalDevice };
@@ -9,14 +15,35 @@ void VulkanDevice::init(vkb::PhysicalDevice vkbPhysicalDevice, VkInstance instan
 	logicalDevice = vkbDevice.device;
 	physicalDevice = vkbPhysicalDevice.physical_device;
 
-	queues[0] = vkbDevice.get_queue(vkb::QueueType::graphics).value();
+	auto graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics);
+	if (!graphicsQueue) {
+		std::cerr << "Failed to get graphics queue. Error: " << graphicsQueue.error().message() << "\n";
+		throw;
+	}
+	queues[0] = std::make_shared<VkQueue>(graphicsQueue.value());
 	queueFamilies[0] = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
 
-	queues[1] = vkbDevice.get_queue(vkb::QueueType::transfer).value();
-	queueFamilies[1] = vkbDevice.get_queue_index(vkb::QueueType::transfer).value();
+	auto transferQueue = vkbDevice.get_queue(vkb::QueueType::transfer);
+	if (!transferQueue) {
+		std::cerr << "Failed to get transfer queue. Error: " << transferQueue.error().message() << "\n";
+		queues[1] = queues[0];
+		queueFamilies[1] = queueFamilies[0];
+	}
+	else {
+		queues[1] = std::make_shared<VkQueue>(transferQueue.value());
+		queueFamilies[1] = vkbDevice.get_queue_index(vkb::QueueType::transfer).value();
+	}
 
-	queues[2] = vkbDevice.get_queue(vkb::QueueType::compute).value();
-	queueFamilies[2] = vkbDevice.get_queue_index(vkb::QueueType::compute).value();
+	auto computeQueue = vkbDevice.get_queue(vkb::QueueType::compute);
+	if (!transferQueue) {
+		std::cerr << "Failed to get compute queue. Error: " << computeQueue.error().message() << "\n";
+		queues[2] = queues[0];
+		queueFamilies[2] = queueFamilies[0];
+	}
+	else {
+		queues[2] = std::make_shared<VkQueue>(computeQueue.value());
+		queueFamilies[2] = vkbDevice.get_queue_index(vkb::QueueType::compute).value();
+	}
 
 	VmaAllocatorCreateInfo allocatorCreateInfo = {};
 	allocatorCreateInfo.physicalDevice = physicalDevice;
@@ -59,7 +86,7 @@ void VulkanDevice::immediateSubmit(std::function<void(VkCommandBuffer* commandBu
 	VkCommandBufferSubmitInfo commandBufferSubmitInfo = vkinit::CommandBufferSubmitInfo(immCommandBuffer);
 	VkSubmitInfo2 submitInfo = vkinit::SubmitInfo2(&commandBufferSubmitInfo, nullptr, nullptr);
 
-	VK_CHECK(vkQueueSubmit2(queues[GRAPHICS], 1, &submitInfo, immFence));
+	VK_CHECK(vkQueueSubmit2(*queues[GRAPHICS].get(), 1, &submitInfo, immFence));
 
 	VK_CHECK(vkWaitForFences(logicalDevice, 1, &immFence, true, 9999999999));
 }

@@ -41,7 +41,7 @@ void VulkanSwapchain::createSwapchain(VulkanDevice* device, VkSurfaceKHR surface
 
 void VulkanSwapchain::rebuildSwapchain(VulkanDevice* device, VkSurfaceKHR surface, uint32_t width, uint32_t height)
 {
-	vkQueueWaitIdle(device->queues[VulkanDevice::GRAPHICS]);
+	vkQueueWaitIdle(*device->queues[VulkanDevice::GRAPHICS].get());
 	destroySwapchain(device);
 	createSwapchain(device, surface, width, height);
 }

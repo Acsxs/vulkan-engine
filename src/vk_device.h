@@ -23,7 +23,7 @@ public:
 	VkPhysicalDevice physicalDevice;
 	VkDevice logicalDevice;
 	uint32_t queueFamilies[3];
-	VkQueue queues[3];
+	std::shared_ptr<VkQueue> queues[3];
 
 	uint32_t getQueueFamilyIndex(uint8_t queueIndex) { return queueFamilies[queueIndex]; };
 

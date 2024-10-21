@@ -1,6 +1,4 @@
-﻿// vulkan_guide.h : Include file for standard system include files,
-// or project specific include files.
-#pragma once
+﻿#pragma once
 
 #include <memory>
 #include <optional>
@@ -18,7 +16,6 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
 
-#define VMA_IMPLEMENTATION
 #include "vk_mem_alloc.h"
 
 
