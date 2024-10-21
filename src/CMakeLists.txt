@@ -11,6 +11,8 @@ add_executable (engine
   vk_device.cpp
   vk_engine.h
   vk_engine.cpp
+  vk_gltf.h
+  vk_gltf.cpp
   vk_initializers.cpp
   vk_initializers.h
   vk_loader.h
