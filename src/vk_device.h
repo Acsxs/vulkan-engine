@@ -13,29 +13,22 @@ public:
 		TRANSFER,
 		COMPUTE
 	};
-	VmaAllocator _allocator;
 
-	VkFence _immFence;
-	VkCommandBuffer _immCommandBuffer;
-	VkCommandPool _immCommandPool;
+	VmaAllocator allocator;
 
-	VkPhysicalDevice _physicalDevice;
-	VkDevice _logicalDevice;
-	uint32_t _queueFamilies[3];
-	VkQueue _queues[3];
+	VkFence immFence;
+	VkCommandBuffer immCommandBuffer;
+	VkCommandPool immCommandPool;
 
-	uint32_t getQueueFamilyIndex(uint8_t queueIndex) { return _queueFamilies[queueIndex]; };
+	VkPhysicalDevice physicalDevice;
+	VkDevice logicalDevice;
+	uint32_t queueFamilies[3];
+	VkQueue queues[3];
 
-	AllocatedBuffer createBuffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
-	void destroyBuffer(const AllocatedBuffer& buffer);
-
-	AllocatedImage createImage(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags aspectFlags, bool mipmapped = false);
-	AllocatedImage createImage(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags aspectFlags, bool mipmapped = false);
-	void destroyImage(const AllocatedImage& img);
+	uint32_t getQueueFamilyIndex(uint8_t queueIndex) { return queueFamilies[queueIndex]; };
 
 	void immediateSubmit(std::function<void(VkCommandBuffer* commandBuffer)>&& function);
 
 	void destroy();
 	void init(vkb::PhysicalDevice physicalDevice, VkInstance instance);
-
 };

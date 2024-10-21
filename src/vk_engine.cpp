@@ -1,26 +1,12 @@
 ﻿
 #include "vk_engine.h"
 #include "vk_initializers.h"
-#include "vk_types.h"
-#include "vk_resources.h"
-#include "vk_pipelines.h"
-
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/transform.hpp>
 
 #include <SDL.h>
 #include <SDL_vulkan.h>
 
 #include <VkBootstrap.h>
 
-#include "imgui.h"
-#include "imgui_impl_sdl2.h"
-#include "imgui_impl_vulkan.h"
-
-#define VMA_IMPLEMENTATION
-#include "vk_mem_alloc.h"
-
-#include <chrono>
 #include <thread>
 
 
@@ -846,133 +832,6 @@ using namespace std;
 //
 //}
 
-//void SpecularMaterial::buildPipelines(VulkanEngine* engine)
-//{
-//	VkShaderModule meshFragShader;
-//	if (vkutil::loadShaderModule("../../shaders/mesh.frag.spv", engine->_vulkanDevice._logicalDevice, &meshFragShader)) {
-//		fmt::println("Mesh fragment shader module loaded successfully");
-//	}
-//	else {
-//		fmt::println("Error when building the mesh fragment shader module");
-//	}
-//	VkShaderModule meshVertexShader;
-//	if (vkutil::loadShaderModule("../../shaders/mesh.vert.spv", engine->_vulkanDevice._logicalDevice, &meshVertexShader)) {
-//		fmt::println("Mesh vertex shader module loaded successfully");
-//	}
-//	else {
-//		fmt::println("Error when building the mesh vertex shader module");
-//
-//	}
-//
-//	VkPushConstantRange matrixRange{};
-//	matrixRange.offset = 0;
-//	matrixRange.size = sizeof(GPUDrawPushConstants);
-//	matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-//
-//	DescriptorLayoutBuilder layoutBuilder;
-//	layoutBuilder.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-//	layoutBuilder.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-//	layoutBuilder.addBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-//
-//	materialLayout = layoutBuilder.build(engine->_vulkanDevice._logicalDevice, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-//
-//	VkDescriptorSetLayout layouts[] = { engine->_gpuSceneDataDescriptorLayout, materialLayout };
-//
-//	VkPipelineLayoutCreateInfo mesh_layout_info = vkinit::PipelineLayoutCreateInfo();
-//	mesh_layout_info.setLayoutCount = 2;
-//	mesh_layout_info.pSetLayouts = layouts;
-//	mesh_layout_info.pPushConstantRanges = &matrixRange;
-//	mesh_layout_info.pushConstantRangeCount = 1;
-//
-//	VkPipelineLayout newLayout;
-//	VK_CHECK(vkCreatePipelineLayout(engine->_vulkanDevice._logicalDevice, &mesh_layout_info, nullptr, &newLayout));
-//
-//	opaquePipeline.layout = newLayout;
-//	transparentPipeline.layout = newLayout;
-//
-//	// build the stage-create-info for both vertex and fragment stages. This lets
-//	// the pipeline know the shader modules per stage
-//	PipelineBuilder pipelineBuilder;
-//	pipelineBuilder.setShaders(meshVertexShader, meshFragShader);
-//	pipelineBuilder.setInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-//	pipelineBuilder.setPolygonMode(VK_POLYGON_MODE_FILL);
-//	pipelineBuilder.setCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
-//	pipelineBuilder.setMultisamplingNone();
-//	pipelineBuilder.disableBlending();
-//	pipelineBuilder.enableDepthtest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
-//
-//	//render format
-//	pipelineBuilder.setColorAttachmentFormat(engine->_drawImage.imageFormat);
-//	pipelineBuilder.setDepthFormat(engine->_depthImage.imageFormat);
-//
-//	// use the triangle layout we created
-//	pipelineBuilder._pipelineLayout = newLayout;
-//
-//	// finally build the pipeline
-//	opaquePipeline.pipeline = pipelineBuilder.buildPipeline(engine->_vulkanDevice._logicalDevice);
-//
-//	// create the transparent variant
-//	pipelineBuilder.enableBlendingAdditive();
-//
-//	pipelineBuilder.enableDepthtest(false, VK_COMPARE_OP_GREATER_OR_EQUAL);
-//
-//	transparentPipeline.pipeline = pipelineBuilder.buildPipeline(engine->_vulkanDevice._logicalDevice);
-//
-//	vkDestroyShaderModule(engine->_vulkanDevice._logicalDevice, meshFragShader, nullptr);
-//	vkDestroyShaderModule(engine->_vulkanDevice._logicalDevice, meshVertexShader, nullptr);
-//}
-//
-//void SpecularMaterial::destroyPipelines(VulkanDevice* device) {
-//	vkDestroyPipeline(device->_logicalDevice, opaquePipeline.pipeline, nullptr);
-//	vkDestroyPipeline(device->_logicalDevice, transparentPipeline.pipeline, nullptr);
-//	vkDestroyPipelineLayout(device->_logicalDevice, opaquePipeline.layout, nullptr);
-//	vkDestroyPipelineLayout(device->_logicalDevice, transparentPipeline.layout, nullptr);
-//}
-//
-//MaterialInstance SpecularMaterial::writeMaterialReference(VulkanDevice* device, PassType pass, const MaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator)
-//{
-//	MaterialInstance matData;
-//	matData.passType = pass;
-//	if (pass == MaterialPass::Transparent) {
-//		matData.pipeline = &transparentPipeline;
-//	}
-//	else {
-//		matData.pipeline = &opaquePipeline;
-//	}
-//
-//	matData.materialSet = descriptorAllocator.allocate(device->_logicalDevice, materialLayout);
-//
-//
-//	writer.clear();
-//	writer.writeBuffer(0, resources.dataBuffer, sizeof(MaterialConstants), resources.dataBufferOffset, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-//	writer.writeImage(1, resources.colorImage.imageView, resources.colorSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-//	writer.writeImage(2, resources.metalRoughImage.imageView, resources.metalRoughSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-//
-//	writer.updateSet(device->_logicalDevice, matData.materialSet);
-//
-//	return matData;
-//}
-
-//void MeshNode::draw(const glm::mat4& topMatrix, DrawContext& ctx)
-//{
-//	glm::mat4 nodeMatrix = topMatrix * worldTransform;
-//
-//	for (auto& s : mesh->surfaces) {
-//		RenderObject def;
-//		def.indexCount = s.count;
-//		def.firstIndex = s.startIndex;
-//		def.indexBuffer = mesh->meshBuffers.indexBuffer.buffer;
-//		def.material = &s.material->data;
-//
-//		def.transform = nodeMatrix;
-//		def.vertexBufferAddress = mesh->meshBuffers.vertexBufferAddress;
-//
-//		ctx.OpaqueSurfaces.push_back(def);
-//	}
-//
-//	// recurse down
-//	Node::draw(topMatrix, ctx);
-//}
 
 
 
@@ -992,24 +851,9 @@ void VulkanEngine::init() {
 	);
 	
 	SDL_SetRelativeMouseMode(SDL_TRUE);
-	camera.relMouse = true;
-	
+
 	initVulkan();
 	initSwapchain();
-	initDescriptors();
-	initPipelines();
-	initImgui();
-	initDummyData();
-	
-	for (int i = 0; i < FRAMES_IN_FLIGHT; i++) {
-		frames[i].init(&vulkanDevice);
-	}
-	
-	camera.velocity = glm::vec3(0.f);
-	camera.position = glm::vec3(0, 0, 5);
-	
-	camera.pitch = 0;
-	camera.yaw = 0;
 }
 
 void VulkanEngine::run() {
@@ -1022,9 +866,9 @@ void VulkanEngine::run() {
 		while (SDL_PollEvent(&e) != 0) {
 			//close the window when user alt-f4s or clicks the X button			
 			if (e.type == SDL_QUIT) bQuit = true;
-	
+
 			if (e.type == SDL_WINDOWEVENT) {
-	
+
 				if (e.window.event == SDL_WINDOWEVENT_MINIMIZED) {
 					rendering = false;
 				}
@@ -1032,45 +876,26 @@ void VulkanEngine::run() {
 					rendering = true;
 				}
 			}
-	
-			camera.processSDLEvent(e);
-			//send SDL event to imgui for handling
-			ImGui_ImplSDL2_ProcessEvent(&e);
 		}
 	
 		//do not draw if we are minimized
 		if (!rendering) {
-			//throttle the speed to avoid the endless spinning
+			//throttle the speed to avoid endless spinning
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 			continue;
 		}
-	
-		// imgui new frame
-		ImGui_ImplVulkan_NewFrame();
-		ImGui_ImplSDL2_NewFrame();
-	
-		// imgui input sensitivity
-		ImGui::NewFrame();
-	
-		if (ImGui::Begin("input sensitivity")) {
-	
-	
-			ImGui::SliderFloat("movespeed", &camera.moveSpeed, 0, 2);
-			ImGui::SliderFloat("mouse sense", &camera.mouseSense, 0, 2);
-	
-			ImGui::End();
-		}
-		ImGui::Render();
 	
 		draw();
 	}
 }
 
-void VulkanEngine::draw() {
-
-}
+void VulkanEngine::draw() {}
 
 void VulkanEngine::destroy() {
+	swapchain.destroySwapchain(&vulkanDevice);
+	vulkanDevice.destroy();
+	vkDestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+	vkDestroyInstance(instance, nullptr);
 
 }
 
@@ -1080,7 +905,7 @@ void VulkanEngine::initVulkan() {
 	vkb::InstanceBuilder vkbInstanceBuilder;
 
 	vkb::Instance vkbInstance = vkbInstanceBuilder
-		.set_app_name("Waves")
+		.set_app_name("Iteration 1")
 		.request_validation_layers(bUseValidationLayers)
 		.use_default_debug_messenger()
 		.require_api_version(1, 3, 0)
@@ -1088,7 +913,7 @@ void VulkanEngine::initVulkan() {
 		.value();
 
 	instance = vkbInstance.instance;
-	debug_messenger = vkbInstance.debug_messenger;
+	debugMessenger = vkbInstance.debug_messenger;
 
 	SDL_Vulkan_CreateSurface(window, instance, &surface);
 
@@ -1119,85 +944,4 @@ void VulkanEngine::initSwapchain() {
 		windowExtent.height,
 		1
 	};
-		
-	VkImageUsageFlags drawImageUsages{};
-	drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-	drawImageUsages |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-	drawImageUsages |= VK_IMAGE_USAGE_STORAGE_BIT;
-	drawImageUsages |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-		
-	VkImageCreateInfo renderImageCreateInfo = vkinit::ImageCreateInfo(drawImage.imageFormat, drawImageUsages, drawImageExtent);
-		
-	VmaAllocationCreateInfo renderImageAllocationCreateInfo = {};
-	renderImageAllocationCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-	renderImageAllocationCreateInfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-	drawImage = vulkanDevice.createImage(drawImageExtent, VK_FORMAT_R16G16B16A16_SFLOAT, drawImageUsages, VK_IMAGE_ASPECT_COLOR_BIT);
-		
-	VkImageUsageFlags depthImageUsages{};
-	depthImageUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-		
-	depthImage = vulkanDevice.createImage(drawImageExtent, VK_FORMAT_D32_SFLOAT, depthImageUsages, VK_IMAGE_ASPECT_DEPTH_BIT);
-	mainDestructor.images.push_back(&drawImage);
-	mainDestructor.images.push_back(&depthImage);
-	
-
-}
-
-void VulkanEngine::initImgui() {
-	//the size of the pool is very oversize, but it's copied from imgui demo itself.
-	VkDescriptorPoolSize descriptorPoolSizes[] = { { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
-		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
-		{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
-		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
-		{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
-		{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
-		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
-		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
-		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
-		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
-		{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 } };
-
-	VkDescriptorPoolCreateInfo descriptorPoolCreateInfo = {};
-	descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-	descriptorPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-	descriptorPoolCreateInfo.maxSets = 1000;
-	descriptorPoolCreateInfo.poolSizeCount = (uint32_t)std::size(descriptorPoolSizes);
-	descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes;
-
-	VK_CHECK(vkCreateDescriptorPool(vulkanDevice._logicalDevice, &descriptorPoolCreateInfo, nullptr, &imguiDescriptorPool));
-
-	ImGui::CreateContext();
-
-	ImGui_ImplSDL2_InitForVulkan(window);
-
-	ImGui_ImplVulkan_InitInfo imguiInitInfo = {};
-	imguiInitInfo.Instance = instance;
-	imguiInitInfo.PhysicalDevice = vulkanDevice._physicalDevice;
-	imguiInitInfo.Device = vulkanDevice._logicalDevice;
-	imguiInitInfo.Queue = vulkanDevice._queues[VulkanDevice::GRAPHICS];
-	imguiInitInfo.DescriptorPool = imguiDescriptorPool;
-	imguiInitInfo.MinImageCount = 3;
-	imguiInitInfo.ImageCount = 3;
-	imguiInitInfo.UseDynamicRendering = true;
-
-	imguiInitInfo.PipelineRenderingCreateInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
-	imguiInitInfo.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
-	imguiInitInfo.PipelineRenderingCreateInfo.pColorAttachmentFormats = &swapchain._swapchainImageFormat;
-
-
-	imguiInitInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-
-	ImGui_ImplVulkan_Init(&imguiInitInfo);
-
-	ImGui_ImplVulkan_CreateFontsTexture();
-}
-
-void VulkanEngine::initPipelines() {
-
-}
-void VulkanEngine::initDescriptors() {
-
-}
-void VulkanEngine::initDummyData() {
-
 }
