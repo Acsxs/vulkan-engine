@@ -4,22 +4,22 @@
 
 void VulkanSwapchain::destroySwapchain(VulkanDevice* device)
 {
-	vkDestroySwapchainKHR(device->_logicalDevice, _swapchain, nullptr);
+	vkDestroySwapchainKHR(device->logicalDevice, swapchain, nullptr);
 
 	// destroy swapchain resources
-	for (int i = 0; i < _swapchainImageViews.size(); i++) {
-		vkDestroyImage(device->_logicalDevice, _swapchainImages[i], nullptr);
-		vkDestroyImageView(device->_logicalDevice, _swapchainImageViews[i], nullptr);
+	for (int i = 0; i < swapchainImageViews.size(); i++) {
+		vkDestroyImage(device->logicalDevice, swapchainImages[i], nullptr);
+		vkDestroyImageView(device->logicalDevice, swapchainImageViews[i], nullptr);
 	}
 }
 
 void VulkanSwapchain::createSwapchain(VulkanDevice* device, VkSurfaceKHR surface, uint32_t width, uint32_t height)
 {
-	vkb::SwapchainBuilder swapchainBuilder{ device->_physicalDevice, device->_logicalDevice, surface };
+	vkb::SwapchainBuilder swapchainBuilder{ device->physicalDevice, device->logicalDevice, surface };
 
-	_swapchainImageFormat = VK_FORMAT_B8G8R8A8_UNORM;
+	swapchainImageFormat = VK_FORMAT_B8G8R8A8_UNORM;
 
-	VkSurfaceFormatKHR surfaceFormat = { .format = _swapchainImageFormat,.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
+	VkSurfaceFormatKHR surfaceFormat = { .format = swapchainImageFormat,.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
 
 	vkb::Swapchain vkbSwapchain = swapchainBuilder
 		//.use_default_format_selection()
@@ -31,17 +31,17 @@ void VulkanSwapchain::createSwapchain(VulkanDevice* device, VkSurfaceKHR surface
 		.build()
 		.value();
 
-	_swapchainExtent = vkbSwapchain.extent;
+	swapchainExtent = vkbSwapchain.extent;
 
 	//store swapchain and its related images
-	_swapchain = vkbSwapchain.swapchain;
-	_swapchainImages = vkbSwapchain.get_images().value();
-	_swapchainImageViews = vkbSwapchain.get_image_views().value();
+	swapchain = vkbSwapchain.swapchain;
+	swapchainImages = vkbSwapchain.get_images().value();
+	swapchainImageViews = vkbSwapchain.get_image_views().value();
 }
 
 void VulkanSwapchain::rebuildSwapchain(VulkanDevice* device, VkSurfaceKHR surface, uint32_t width, uint32_t height)
 {
-	vkQueueWaitIdle(device->_queues[VulkanDevice::GRAPHICS]);
+	vkQueueWaitIdle(*device->queues[VulkanDevice::GRAPHICS].get());
 	destroySwapchain(device);
 	createSwapchain(device, surface, width, height);
 }
@@ -69,7 +69,7 @@ void VulkanSwapchain::transitionSwapchainImage(
     imageBarrier.newLayout = newLayout;
 
     imageBarrier.subresourceRange = vkinit::ImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
-    imageBarrier.image = _swapchainImages[imageIndex];
+    imageBarrier.image = swapchainImages[imageIndex];
 
     VkDependencyInfo dependencyInfo{};
     dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;

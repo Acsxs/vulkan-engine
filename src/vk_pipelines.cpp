@@ -70,6 +70,7 @@ VkPipeline vkutil::buildPipeline(VulkanDevice* device, VkPipelineLayout layout, 
         colorBlendAttachment.blendEnable = VK_FALSE;
     }
     else if (info.blending == PipelineInfo::ADDITIVE) {
+        // destination is current colour + (new colour* new color alpha)
         colorBlendAttachment.blendEnable = VK_TRUE;
         colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
         colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
@@ -79,6 +80,7 @@ VkPipeline vkutil::buildPipeline(VulkanDevice* device, VkPipelineLayout layout, 
         colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
     }
     else if (info.blending == PipelineInfo::ALPHA) {
+        // destination is (current colour*(1-new color alpha)) + (new colour* new color alpha)
         colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
         colorBlendAttachment.blendEnable = VK_TRUE;
         colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
@@ -89,6 +91,7 @@ VkPipeline vkutil::buildPipeline(VulkanDevice* device, VkPipelineLayout layout, 
         colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
     }
 
+    // No multisampling
     VkPipelineMultisampleStateCreateInfo multisampling;
     multisampling.sampleShadingEnable = VK_FALSE;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -161,7 +164,7 @@ VkPipeline vkutil::buildPipeline(VulkanDevice* device, VkPipelineLayout layout, 
     graphicsPipelineCreateInfo.pDynamicState = &dynamicInfo;
 
     VkPipeline newPipeline;
-    if (vkCreateGraphicsPipelines(device->_logicalDevice, VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo, nullptr, &newPipeline) != VK_SUCCESS) {
+    if (vkCreateGraphicsPipelines(device->logicalDevice, VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo, nullptr, &newPipeline) != VK_SUCCESS) {
         fmt::println("failed to create pipeline");
         return VK_NULL_HANDLE; // failed to create graphics pipeline
     }
@@ -171,47 +174,6 @@ VkPipeline vkutil::buildPipeline(VulkanDevice* device, VkPipelineLayout layout, 
 };
 
 void VulkanPipeline::init(VulkanDevice* device, PipelineInfo info) {
-    VK_CHECK(vkCreatePipelineLayout(device->_logicalDevice, &info.pipelineLayoutInfo, nullptr, &pipelineLayout));
+    VK_CHECK(vkCreatePipelineLayout(device->logicalDevice, &info.pipelineLayoutInfo, nullptr, &pipelineLayout));
     pipeline = vkutil::buildPipeline(device, pipelineLayout, info);
-}
-
-
-void MaterialPipelines::init(VulkanDevice* device, VkFormat drawFormat, VkFormat depthFormat, VkPipelineLayoutCreateInfo layout) {
-    VkShaderModule meshFragShader;
-    if (vkutil::loadShaderModule("../../shaders/mesh.frag.spv", device->_logicalDevice, &meshFragShader)) {
-        fmt::println("Mesh fragment shader module loaded successfully");
-    }
-    else {
-        fmt::println("Error when building the mesh fragment shader module");
-    }
-    VkShaderModule meshVertexShader;
-    if (vkutil::loadShaderModule("../../shaders/mesh.vert.spv", device->_logicalDevice, &meshVertexShader)) {
-        fmt::println("Mesh vertex shader module loaded successfully");
-    }
-    else {
-        fmt::println("Error when building the mesh vertex shader module");
-    }
-
-    PipelineInfo pipelineInfo = {};
-
-    pipelineInfo.vertexShader = meshVertexShader;
-    pipelineInfo.fragmentShader = meshFragShader;
-    pipelineInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    pipelineInfo.mode = VK_POLYGON_MODE_FILL;
-    pipelineInfo.cullMode = VK_CULL_MODE_NONE;
-    pipelineInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
-    pipelineInfo.blending = PipelineInfo::NONE;
-    pipelineInfo.colourAttachmentFormat = drawFormat;
-    pipelineInfo.depthFormat = depthFormat;
-    pipelineInfo.depthWriteEnable = true;
-    pipelineInfo.depthCompareOperation = VK_COMPARE_OP_GREATER_OR_EQUAL;
-    pipelineInfo.pipelineLayoutInfo = layout;
-
-    opaquePipeline.init(device, pipelineInfo);
-
-    pipelineInfo.blending = PipelineInfo::ALPHA;
-    transparentPipeline.init(device, pipelineInfo);
-
-    vkDestroyShaderModule(device->_logicalDevice, meshFragShader, nullptr);
-    vkDestroyShaderModule(device->_logicalDevice, meshVertexShader, nullptr);
 }

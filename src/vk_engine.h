@@ -6,7 +6,6 @@
 #include "vk_device.h"
 #include "vk_types.h"
 #include "vk_descriptors.h"
-#include "vk_loader.h"
 #include "vk_destructor.h"
 #include "vk_swapchain.h"
 #include "camera.h"
@@ -179,16 +178,15 @@
 //};
 
 
-
 struct FrameData {
-	VkSemaphore _swapchainSemaphore, _renderSemaphore;
-	VkFence _renderFence;
+	VkSemaphore swapchainSemaphore, renderSemaphore;
+	VkFence renderFence;
 	
-	VkCommandPool _commandPool;
-	VkCommandBuffer _mainCommandBuffer;
-	DescriptorAllocatorGrowable _frameDescriptors;
+	VkCommandPool commandPool;
+	VkCommandBuffer mainCommandBuffer;
+	DescriptorAllocatorGrowable frameDescriptors;
 	
-	ResourceDestructor _frameDestructor;
+	ResourceDestructor frameDestructor;
 	void destroy(VulkanDevice* device);
 	void init(VulkanDevice* device);
 };
@@ -196,8 +194,6 @@ struct FrameData {
 class VulkanEngine {
 public:
 	uint64_t frameCount;
-	std::chrono::system_clock::time_point startTime;
-	std::chrono::system_clock::time_point previousFrameEnd;
 	float deltaTime;
 	bool rendering{ false };
 
@@ -205,13 +201,16 @@ public:
 	struct SDL_Window* window{ nullptr };
 
 	VkInstance instance;
-	VkDebugUtilsMessengerEXT debug_messenger;
+	VkDebugUtilsMessengerEXT debugMessenger;
 	VulkanDevice vulkanDevice;
 	ResourceDestructor mainDestructor;
-	VulkanSwapchain swapchain;
+	VulkanSwapchain vulkanSwapchain;
 	VkSurfaceKHR surface;
 
+	VkExtent2D drawExtent;
+
 	FrameData framesData[FRAMES_IN_FLIGHT];
+	FrameData& getCurrentFrameData() { return framesData[frameCount % FRAMES_IN_FLIGHT]; };
 
 	Camera camera;
 
@@ -236,15 +235,24 @@ public:
 	VkSampler defaultSamplerNearest;
 
 	VulkanPipeline defaultPipeline;
+	VkShaderModule defaultVertexShader;
+	VkShaderModule defaultFragmentShader;
+
+	std::vector<Vertex> vertices;
+	std::vector<uint32_t> indices;
+
+	AllocatedBuffer indexBuffer;
+	AllocatedBuffer vertexBuffer;
+	VkDeviceAddress vertexBufferAddress;
 
 	void init();
 	void run();
 	void draw();
 	void destroy();
 private:
+	void drawGeometry(VkCommandBuffer* commandBuffer);
 	void initVulkan();
 	void initSwapchain();
-	void initImgui();
 	void initPipelines();
 	void initDescriptors();
 	void initDummyData();

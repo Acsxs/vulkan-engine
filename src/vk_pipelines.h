@@ -35,13 +35,6 @@ struct VulkanPipeline {
     VkPipelineLayout pipelineLayout;
 
     void init(VulkanDevice* device,  PipelineInfo info);
-    void destroy(VulkanDevice* device) { vkDestroyPipeline(device->_logicalDevice, pipeline, nullptr); vkDestroyPipelineLayout(device->_logicalDevice, pipelineLayout, nullptr); };
+    void destroy(VulkanDevice* device) { vkDestroyPipeline(device->logicalDevice, pipeline, nullptr); vkDestroyPipelineLayout(device->logicalDevice, pipelineLayout, nullptr); };
 };
 
-
-struct MaterialPipelines {
-    VulkanPipeline opaquePipeline;
-    VulkanPipeline transparentPipeline;
-    void init (VulkanDevice* device, VkFormat drawFormat, VkFormat depthFormat, VkPipelineLayoutCreateInfo layout);
-    void destroy(VulkanDevice* device) { opaquePipeline.destroy(device); transparentPipeline.destroy(device); };
-};

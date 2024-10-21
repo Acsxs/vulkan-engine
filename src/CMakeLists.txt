@@ -13,10 +13,6 @@ add_executable (engine
   vk_engine.cpp
   vk_initializers.cpp
   vk_initializers.h
-  vk_loader.h
-  vk_loader.cpp
-  vk_material.h
-  vk_material.cpp
   vk_pipelines.h
   vk_pipelines.cpp
   vk_resources.h
