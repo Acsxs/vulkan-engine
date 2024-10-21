@@ -490,10 +490,6 @@ using namespace std;
 //	_mainDestructor.images.push_back(&_depthImage);
 //}
 
-//void VulkanEngine::initCommands() {}
-//
-//void VulkanEngine::initSyncStructures() {}
-
 //void VulkanEngine::initImgui()
 //{
 //	//  the size of the pool is very oversize, but it's copied from imgui demo itself.
@@ -1025,7 +1021,7 @@ void VulkanEngine::init() {
 	}
 	
 	camera.velocity = glm::vec3(0.f);
-	camera.position = glm::vec3(0, 0, 5);
+	camera.position = glm::vec3(0, 0, 0);
 	
 	camera.pitch = 0;
 	camera.yaw = 0;
@@ -1051,6 +1047,7 @@ void VulkanEngine::run() {
 					rendering = true;
 				}
 			}
+			camera.processSDLEvent(e);
 		}
 	
 		//do not draw if we are minimized
@@ -1077,6 +1074,8 @@ void VulkanEngine::draw() {
 		vulkanSwapchain.rebuildSwapchain(&vulkanDevice, surface, windowExtent.height, windowExtent.width);
 		return;
 	}
+
+
 	
 	VK_CHECK(vkResetFences(vulkanDevice.logicalDevice, 1, &currentFrame->renderFence));
 	
@@ -1087,7 +1086,9 @@ void VulkanEngine::draw() {
 	drawExtent.width = drawImage.imageExtent.width;
 	drawExtent.height = drawImage.imageExtent.height;
 	
-	
+
+
+
 	VK_CHECK(vkBeginCommandBuffer(currentFrame->mainCommandBuffer, &commandBufferBeginInfo));
 	
 	drawImage.transitionImage(&currentFrame->mainCommandBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -1103,6 +1104,9 @@ void VulkanEngine::draw() {
 	vulkanSwapchain.transitionSwapchainImage(&currentFrame->mainCommandBuffer, swapchainImageIndex, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 	
 	VK_CHECK(vkEndCommandBuffer(currentFrame->mainCommandBuffer));
+
+
+
 
 	VkCommandBufferSubmitInfo commandBufferSubmitInfo = vkinit::CommandBufferSubmitInfo(currentFrame->mainCommandBuffer);
 	
@@ -1128,16 +1132,13 @@ void VulkanEngine::draw() {
 }
 
 void VulkanEngine::destroy() {
-	vkDestroyShaderModule(vulkanDevice.logicalDevice, defaultFragmentShader, nullptr);
-	vkDestroyShaderModule(vulkanDevice.logicalDevice, defaultVertexShader, nullptr);
-
 	vulkanSwapchain.destroySwapchain(&vulkanDevice);
 	vulkanDevice.destroy();
 	vkb::destroy_debug_utils_messenger(instance, debugMessenger, nullptr);
 	vkDestroyInstance(instance, nullptr);
 }
 
-void VulkanEngine::drawGeometry(VkCommandBuffer* commandBuffer) {	
+void VulkanEngine::drawGeometry(VkCommandBuffer* commandBuffer) {
 
 	//	//begin a render pass  connected to our draw image
 	//	VkRenderingAttachmentInfo colorAttachment = vkinit::RenderingAttachmentInfo(_drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL); 
@@ -1212,12 +1213,12 @@ void VulkanEngine::drawGeometry(VkCommandBuffer* commandBuffer) {
 	vkCmdSetViewport(*commandBuffer, 0, 1, &viewport);
 	vkCmdSetScissor(*commandBuffer, 0, 1, &scissor);
 
-	
+
 	vkCmdBindIndexBuffer(*commandBuffer, indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
-	
+
 	GlobalGeometryPushConstants pushConstants;
 	pushConstants.vertexBuffer = vertexBufferAddress;
-	pushConstants.worldMatrix = glm::mat4();
+	pushConstants.worldMatrix = glm::mat4{1.f};
 	vkCmdPushConstants(*commandBuffer, defaultPipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GlobalGeometryPushConstants), &pushConstants);
 
 	vkCmdDrawIndexed(*commandBuffer, indices.size(), 1, 0, 0, 0);
@@ -1336,6 +1337,9 @@ void VulkanEngine::initPipelines() {
 	defaultPipelineInfo.pipelineLayoutInfo = pipelineLayoutInfo;
 	
 	defaultPipeline.init(&vulkanDevice, defaultPipelineInfo);
+
+	vkDestroyShaderModule(vulkanDevice.logicalDevice, defaultFragmentShader, nullptr);
+	vkDestroyShaderModule(vulkanDevice.logicalDevice, defaultVertexShader, nullptr);
 
 }
 
