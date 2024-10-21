@@ -35,7 +35,7 @@ struct VulkanPipeline {
     VkPipelineLayout pipelineLayout;
 
     void init(VulkanDevice* device,  PipelineInfo info);
-    void destroy(VulkanDevice* device) { vkDestroyPipeline(device->_logicalDevice, pipeline, nullptr); vkDestroyPipelineLayout(device->_logicalDevice, pipelineLayout, nullptr); };
+    void destroy(VulkanDevice* device) { vkDestroyPipeline(device->logicalDevice, pipeline, nullptr); vkDestroyPipelineLayout(device->logicalDevice, pipelineLayout, nullptr); };
 };
 
 

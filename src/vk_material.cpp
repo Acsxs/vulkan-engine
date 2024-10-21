@@ -13,7 +13,7 @@ void SpecularMaterialWriter::buildPipelines(VulkanDevice* device, VkFormat drawF
 	layoutBuilder.addBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 	layoutBuilder.addBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER); 
 
-	materialDescriptorLayout = layoutBuilder.build(device->_logicalDevice, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+	materialDescriptorLayout = layoutBuilder.build(device->logicalDevice, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 
 	VkDescriptorSetLayout layouts[] = { sceneDescriptorLayout, materialDescriptorLayout };
 
@@ -40,7 +40,7 @@ SpecularMaterialReference SpecularMaterialWriter::writeMaterialInstance(VulkanDe
 	}
 	
 
-	matData.materialDescriptors = descriptorAllocator.allocate(device->_logicalDevice, materialDescriptorLayout);
+	matData.materialDescriptors = descriptorAllocator.allocate(device->logicalDevice, materialDescriptorLayout);
 
 
 	writer.clear();
@@ -48,7 +48,7 @@ SpecularMaterialReference SpecularMaterialWriter::writeMaterialInstance(VulkanDe
 	writer.writeImage(1, resources.albedoImage.imageView, resources.albedoSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 	writer.writeImage(2, resources.specularGlossinessImage.imageView, resources.specularGlossinessSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
-	writer.updateSet(device->_logicalDevice, matData.materialDescriptors);
+	writer.updateSet(device->logicalDevice, matData.materialDescriptors);
 
 	return matData;
 }

@@ -8,6 +8,22 @@
 
 
 
+
+
+
+enum class MaterialPassType: uint8_t {
+	MainColour,
+	Transparent,
+	Other
+};
+
+
+struct MaterialReference {
+	VulkanPipeline* pipeline;
+	VkDescriptorSet materialDescriptors;
+	MaterialPassType pass;
+};
+
 struct SpecularMaterialResources {
 	AllocatedImage albedoImage;
 	VkSampler albedoSampler;
@@ -23,12 +39,6 @@ struct SpecularMaterialConstants {
 	glm::vec4 extra[14];
 };
 
-
-enum class MaterialPassType: uint8_t {
-	MainColour,
-	Transparent,
-	Other
-};
 struct SpecularMaterialWriter {
 	VkDescriptorSetLayout materialDescriptorLayout;
 	DescriptorWriter writer;
@@ -40,9 +50,6 @@ struct SpecularMaterialWriter {
 	SpecularMaterialReference writeMaterialInstance(VulkanDevice* device, MaterialPassType pass, const SpecularMaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
 };
 
-struct SpecularMaterialReference {
-	VulkanPipeline* pipeline;
-	VkDescriptorSet materialDescriptors;
-	MaterialPassType pass;
-};
+
+struct SpecularMaterialReference : MaterialReference {};
 

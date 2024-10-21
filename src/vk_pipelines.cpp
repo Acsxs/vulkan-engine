@@ -161,7 +161,7 @@ VkPipeline vkutil::buildPipeline(VulkanDevice* device, VkPipelineLayout layout, 
     graphicsPipelineCreateInfo.pDynamicState = &dynamicInfo;
 
     VkPipeline newPipeline;
-    if (vkCreateGraphicsPipelines(device->_logicalDevice, VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo, nullptr, &newPipeline) != VK_SUCCESS) {
+    if (vkCreateGraphicsPipelines(device->logicalDevice, VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo, nullptr, &newPipeline) != VK_SUCCESS) {
         fmt::println("failed to create pipeline");
         return VK_NULL_HANDLE; // failed to create graphics pipeline
     }
@@ -171,21 +171,21 @@ VkPipeline vkutil::buildPipeline(VulkanDevice* device, VkPipelineLayout layout, 
 };
 
 void VulkanPipeline::init(VulkanDevice* device, PipelineInfo info) {
-    VK_CHECK(vkCreatePipelineLayout(device->_logicalDevice, &info.pipelineLayoutInfo, nullptr, &pipelineLayout));
+    VK_CHECK(vkCreatePipelineLayout(device->logicalDevice, &info.pipelineLayoutInfo, nullptr, &pipelineLayout));
     pipeline = vkutil::buildPipeline(device, pipelineLayout, info);
 }
 
 
 void MaterialPipelines::init(VulkanDevice* device, VkFormat drawFormat, VkFormat depthFormat, VkPipelineLayoutCreateInfo layout) {
     VkShaderModule meshFragShader;
-    if (vkutil::loadShaderModule("../../shaders/mesh.frag.spv", device->_logicalDevice, &meshFragShader)) {
+    if (vkutil::loadShaderModule("../../shaders/mesh.frag.spv", device->logicalDevice, &meshFragShader)) {
         fmt::println("Mesh fragment shader module loaded successfully");
     }
     else {
         fmt::println("Error when building the mesh fragment shader module");
     }
     VkShaderModule meshVertexShader;
-    if (vkutil::loadShaderModule("../../shaders/mesh.vert.spv", device->_logicalDevice, &meshVertexShader)) {
+    if (vkutil::loadShaderModule("../../shaders/mesh.vert.spv", device->logicalDevice, &meshVertexShader)) {
         fmt::println("Mesh vertex shader module loaded successfully");
     }
     else {
@@ -212,6 +212,6 @@ void MaterialPipelines::init(VulkanDevice* device, VkFormat drawFormat, VkFormat
     pipelineInfo.blending = PipelineInfo::ALPHA;
     transparentPipeline.init(device, pipelineInfo);
 
-    vkDestroyShaderModule(device->_logicalDevice, meshFragShader, nullptr);
-    vkDestroyShaderModule(device->_logicalDevice, meshVertexShader, nullptr);
+    vkDestroyShaderModule(device->logicalDevice, meshFragShader, nullptr);
+    vkDestroyShaderModule(device->logicalDevice, meshVertexShader, nullptr);
 }

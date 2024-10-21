@@ -3,6 +3,33 @@
 #include <VkBootstrap.h>
 #include "vk_types.h"
 #include "vk_initializers.h"
+#include <unordered_map>
+
+struct Scene {
+    std::unordered_map<std::string, std::shared_ptr<Node>> nodes;
+    std::vector<std::shared_ptr<Node>> topNodes;
+    std::unordered_map<std::string, AllocatedImage> images;
+    std::unordered_map<std::string, std::shared_ptr<MaterialReference>> materials;
+};
+
+struct GeometrySurface {
+    uint32_t startIndex;
+    uint32_t count;
+    std::shared_ptr<MaterialReference> material;
+};
+
+struct MeshBuffers {
+    AllocatedBuffer indexBuffer;
+    AllocatedBuffer vertexBuffer;
+    VkDeviceAddress vertexBufferAddress;
+};
+
+struct Mesh {
+    std::string name;
+
+    std::vector<GeoSurface> surfaces;
+    MeshBuffers meshBuffers;
+};
 
 
 struct SceneData {
@@ -16,7 +43,7 @@ struct SceneData {
     glm::vec4 sunlightColor;
 };
 
-struct Node {
+struct Node: public IRenderable {
     std::weak_ptr<Node> parent;
     std::vector<std::shared_ptr<Node>> children;
 
@@ -38,4 +65,11 @@ struct Node {
             c->appendDraw(topMatrix, ctx);
         }
     }
+};
+
+struct MeshNode : public Node {
+    std::shared_ptr<MeshAsset> mesh;
+
+    virtual void draw(const glm::mat4& topMatrix, DrawContext& ctx) override;
+
 };

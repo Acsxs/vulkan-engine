@@ -1164,7 +1164,7 @@ void VulkanEngine::initImgui() {
 	descriptorPoolCreateInfo.poolSizeCount = (uint32_t)std::size(descriptorPoolSizes);
 	descriptorPoolCreateInfo.pPoolSizes = descriptorPoolSizes;
 
-	VK_CHECK(vkCreateDescriptorPool(vulkanDevice._logicalDevice, &descriptorPoolCreateInfo, nullptr, &imguiDescriptorPool));
+	VK_CHECK(vkCreateDescriptorPool(vulkanDevice.logicalDevice, &descriptorPoolCreateInfo, nullptr, &imguiDescriptorPool));
 
 	ImGui::CreateContext();
 
@@ -1172,9 +1172,9 @@ void VulkanEngine::initImgui() {
 
 	ImGui_ImplVulkan_InitInfo imguiInitInfo = {};
 	imguiInitInfo.Instance = instance;
-	imguiInitInfo.PhysicalDevice = vulkanDevice._physicalDevice;
-	imguiInitInfo.Device = vulkanDevice._logicalDevice;
-	imguiInitInfo.Queue = vulkanDevice._queues[VulkanDevice::GRAPHICS];
+	imguiInitInfo.PhysicalDevice = vulkanDevice.physicalDevice;
+	imguiInitInfo.Device = vulkanDevice.logicalDevice;
+	imguiInitInfo.Queue = *vulkanDevice.queues[VulkanDevice::GRAPHICS].get();
 	imguiInitInfo.DescriptorPool = imguiDescriptorPool;
 	imguiInitInfo.MinImageCount = 3;
 	imguiInitInfo.ImageCount = 3;
@@ -1182,7 +1182,7 @@ void VulkanEngine::initImgui() {
 
 	imguiInitInfo.PipelineRenderingCreateInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
 	imguiInitInfo.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
-	imguiInitInfo.PipelineRenderingCreateInfo.pColorAttachmentFormats = &swapchain._swapchainImageFormat;
+	imguiInitInfo.PipelineRenderingCreateInfo.pColorAttachmentFormats = &swapchain.swapchainImageFormat;
 
 
 	imguiInitInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;

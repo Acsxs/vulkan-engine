@@ -13,18 +13,18 @@ public:
 		TRANSFER,
 		COMPUTE
 	};
-	VmaAllocator _allocator;
+	VmaAllocator allocator;
 
-	VkFence _immFence;
-	VkCommandBuffer _immCommandBuffer;
-	VkCommandPool _immCommandPool;
+	VkFence immFence;
+	VkCommandBuffer immCommandBuffer;
+	VkCommandPool immCommandPool;
 
-	VkPhysicalDevice _physicalDevice;
-	VkDevice _logicalDevice;
-	uint32_t _queueFamilies[3];
-	VkQueue _queues[3];
+	VkPhysicalDevice physicalDevice;
+	VkDevice logicalDevice;
+	uint32_t queueFamilies[3];
+	std::shared_ptr<VkQueue> queues[3];
 
-	uint32_t getQueueFamilyIndex(uint8_t queueIndex) { return _queueFamilies[queueIndex]; };
+	uint32_t getQueueFamilyIndex(uint8_t queueIndex) { return queueFamilies[queueIndex]; };
 
 	AllocatedBuffer createBuffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
 	void destroyBuffer(const AllocatedBuffer& buffer);

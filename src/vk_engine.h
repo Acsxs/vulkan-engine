@@ -181,14 +181,14 @@
 
 
 struct FrameData {
-	VkSemaphore _swapchainSemaphore, _renderSemaphore;
-	VkFence _renderFence;
+	VkSemaphore swapchainSemaphore, renderSemaphore;
+	VkFence renderFence;
 	
-	VkCommandPool _commandPool;
-	VkCommandBuffer _mainCommandBuffer;
-	DescriptorAllocatorGrowable _frameDescriptors;
+	VkCommandPool commandPool;
+	VkCommandBuffer mainCommandBuffer;
+	DescriptorAllocatorGrowable frameDescriptors;
 	
-	ResourceDestructor _frameDestructor;
+	ResourceDestructor frameDestructor;
 	void destroy(VulkanDevice* device);
 	void init(VulkanDevice* device);
 };

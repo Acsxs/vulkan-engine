@@ -4,12 +4,12 @@
 #include "vk_device.h"
 
 struct VulkanSwapchain {
-	VkSurfaceKHR _surface;
-	VkSwapchainKHR _swapchain;
-	VkFormat _swapchainImageFormat;
-	VkExtent2D _swapchainExtent;
-	std::vector<VkImage> _swapchainImages;
-	std::vector<VkImageView> _swapchainImageViews;
+	VkSurfaceKHR surface;
+	VkSwapchainKHR swapchain;
+	VkFormat swapchainImageFormat;
+	VkExtent2D swapchainExtent;
+	std::vector<VkImage> swapchainImages;
+	std::vector<VkImageView> swapchainImageViews;
 
 	void destroySwapchain(VulkanDevice* device);
 	void createSwapchain(VulkanDevice* device, VkSurfaceKHR surface, uint32_t width, uint32_t height);
