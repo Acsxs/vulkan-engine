@@ -18,4 +18,14 @@
 - Camera
 
 ## Structure
+### Major classes/structs:
+- VulkanEngine: main class, collects all other classes, interface for game logic should extend this class
+- VulkanDevice: encapsulates device related objects, such as VkPhysicalDevice, VkDevice, VmaAllocator, VkQueue, and much more
+- VulkanSwapchain: abstraction of Vulkan's swapchain
+- AllocatedImage: encapsulates image, image view, and allocation objects, as well as the image size in pixels, image layout, and image format. Allows simple image layout transitions
+- AllocatedBuffer: encapsulates buffers and allocations
+- MetallicRoughnessMaterialWriter: writer that creates descriptor sets for MetallicMaterialInstance
+- DescriptorAllocatorGrowable: abstraction of descriptor pools and sets that can increase in size to match needs
+- VulkanGLTFModel: loader for gLTF files, stores all data for materials, vertices, and indices per file
+
 
