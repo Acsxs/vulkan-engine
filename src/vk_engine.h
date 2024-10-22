@@ -6,7 +6,7 @@
 #include "vk_device.h"
 #include "vk_types.h"
 #include "vk_descriptors.h"
-#include "vk_destructor.h"
+#include "vk_pipelines.h"
 #include "vk_swapchain.h"
 #include "camera.h"
 
@@ -186,7 +186,6 @@ struct FrameData {
 	VkCommandBuffer mainCommandBuffer;
 	DescriptorAllocatorGrowable frameDescriptors;
 	
-	ResourceDestructor frameDestructor;
 	void destroy(VulkanDevice* device);
 	void init(VulkanDevice* device);
 };
@@ -203,7 +202,6 @@ public:
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debugMessenger;
 	VulkanDevice vulkanDevice;
-	ResourceDestructor mainDestructor;
 	VulkanSwapchain vulkanSwapchain;
 	VkSurfaceKHR surface;
 
