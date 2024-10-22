@@ -15,11 +15,20 @@
 #include <vulkan/vk_enum_string_helper.h>
 #include <fmt/core.h>
 
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/matrix_inverse.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
 
 #include "vk_resources.h"
 #include "vk_material.h"
+#include <iostream>
+
 
 #define VK_CHECK(x) do { VkResult err = x; if (err) {fmt::println("Detected Vulkan error: {}", string_VkResult(err)); abort(); } } while (0)
 
@@ -36,12 +45,7 @@ struct Vertex {
     glm::vec4 color;
 };
 
-struct GPUDrawPushConstants {
-    glm::mat4 worldMatrix;
-    VkDeviceAddress vertexBuffer;
-};
-
-struct GPUSceneData {
+struct SceneData {
     glm::mat4 view;
     glm::mat4 proj;
     glm::mat4 viewproj;
@@ -59,7 +63,7 @@ struct DrawObjectInfo {
     VkDeviceAddress vertexBufferAddress;
     glm::mat4 transform;
 
-    MaterialReference* material;
+    MaterialInstance* material;
 };
 
 
@@ -68,9 +72,4 @@ struct DrawObjectCollection {
     std::vector<DrawObjectInfo> transparentObjects;
 };
 
-
-// base class for a renderable dynamic object
-class IRenderable {
-    virtual void draw(const glm::mat4& topMatrix, DrawObjectCollection& ctx) = 0;
-};
 

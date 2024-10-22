@@ -999,10 +999,10 @@ void VulkanEngine::init() {
 	initDescriptors();
 	initPipelines();
 	initImgui();
-	initDummyData();
+	initData();
 	
 	for (int i = 0; i < FRAMES_IN_FLIGHT; i++) {
-		frames[i].init(&vulkanDevice);
+		framesData[i].init(&vulkanDevice);
 	}
 	
 	camera.velocity = glm::vec3(0.f);
@@ -1072,6 +1072,11 @@ void VulkanEngine::draw() {
 
 void VulkanEngine::destroy() {
 
+	globalDescriptorAllocator.destroyPools(_device);
+
+	vkDestroyDescriptorSetLayout(_device, _gpuSceneDataDescriptorLayout, nullptr);
+	vkDestroyDescriptorSetLayout(_device, _singleImageDescriptorLayout, nullptr);
+	vkDestroyDescriptorSetLayout(_device, _drawImageDescriptorLayout, nullptr);
 }
 
 
@@ -1080,7 +1085,7 @@ void VulkanEngine::initVulkan() {
 	vkb::InstanceBuilder vkbInstanceBuilder;
 
 	vkb::Instance vkbInstance = vkbInstanceBuilder
-		.set_app_name("Waves")
+		.set_app_name("Refactor")
 		.request_validation_layers(bUseValidationLayers)
 		.use_default_debug_messenger()
 		.require_api_version(1, 3, 0)
@@ -1194,10 +1199,64 @@ void VulkanEngine::initImgui() {
 
 void VulkanEngine::initPipelines() {
 
+	DescriptorLayoutBuilder layoutBuilder;
+	layoutBuilder.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+	layoutBuilder.addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+	layoutBuilder.addBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+	layoutBuilder.addBinding(3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+
+
+	VkDescriptorSetLayout materialLayout = layoutBuilder.build(vulkanDevice.logicalDevice, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+
+	VkDescriptorSetLayout layouts[] = { sceneDataDescriptorLayout, materialLayout };
+
+	materialWriter.buildPipelines(&vulkanDevice, drawImage.imageFormat, depthImage.imageFormat, sceneDataDescriptorLayout);
 }
 void VulkanEngine::initDescriptors() {
+	std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes =
+	{
+		{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 }
+	};
 
+	globalDescriptorAllocator.init(vulkanDevice.logicalDevice, 10, sizes);
+
+	{
+		DescriptorLayoutBuilder builder;
+		builder.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+		sceneDataDescriptorLayout = builder.build(vulkanDevice.logicalDevice, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+	}
+
+	{
+		// support for compute pipelines
+		DescriptorLayoutBuilder builder;
+		builder.addBinding(0, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+		drawImageDescriptorLayout = builder.build(vulkanDevice.logicalDevice, VK_SHADER_STAGE_COMPUTE_BIT);
+	}
+
+	drawImageDescriptors = globalDescriptorAllocator.allocate(vulkanDevice.logicalDevice, drawImageDescriptorLayout);
+
+	{
+		DescriptorWriter writer;
+		writer.writeImage(0, drawImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+
+		writer.updateSet(vulkanDevice.logicalDevice, drawImageDescriptors);
+	}
+
+	for (int i = 0; i < FRAMES_IN_FLIGHT; i++) {
+		// create a descriptor pool
+		std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> frame_sizes = {
+			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3 },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 },
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4 },
+		};
+		framesData[i].frameDescriptors = DescriptorAllocatorGrowable{};
+		framesData[i].frameDescriptors.init(vulkanDevice.logicalDevice, 1000, frame_sizes);
+	}
 }
-void VulkanEngine::initDummyData() {
 
+void VulkanEngine::initData() {
+	VulkanGLTFModel model;
+	model.init(&vulkanDevice, "", materialWriter);
 }

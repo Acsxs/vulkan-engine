@@ -8,7 +8,7 @@
 
 class VulkanDevice {
 public:
-	enum queueIndices {
+	enum queueType {
 		GRAPHICS,
 		TRANSFER,
 		COMPUTE
@@ -33,7 +33,7 @@ public:
 	AllocatedImage createImage(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags aspectFlags, bool mipmapped = false);
 	void destroyImage(const AllocatedImage& img);
 
-	void immediateSubmit(std::function<void(VkCommandBuffer* commandBuffer)>&& function);
+	void immediateSubmit(std::function<void(VkCommandBuffer* commandBuffer)>&& function, queueType queueType);
 
 	void destroy();
 	void init(vkb::PhysicalDevice physicalDevice, VkInstance instance);

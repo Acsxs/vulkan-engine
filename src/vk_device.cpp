@@ -131,7 +131,7 @@ AllocatedImage VulkanDevice::createImage(void* data, VkExtent3D size, VkFormat f
 
 	AllocatedImage newImage = createImage(size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, aspect, mipmapped);
 
-	immediateSubmit([&](VkCommandBuffer* commandBuffer) { uploadBuffer.copyToImage(commandBuffer, newImage, 0, 0, 0, aspect, size); });
+	immediateSubmit([&](VkCommandBuffer* commandBuffer) { uploadBuffer.copyToImage(commandBuffer, newImage, 0, 0, 0, aspect, size); }, GRAPHICS);
 
 	destroyBuffer(uploadBuffer);
 
@@ -146,7 +146,7 @@ void VulkanDevice::destroyImage(const AllocatedImage& img)
 
 
 
-void VulkanDevice::immediateSubmit(std::function<void(VkCommandBuffer* commandBuffer)>&& function)
+void VulkanDevice::immediateSubmit(std::function<void(VkCommandBuffer* commandBuffer)>&& function, queueType queueType)
 {
 	VK_CHECK(vkResetFences(logicalDevice, 1, &immFence));
 	VK_CHECK(vkResetCommandBuffer(immCommandBuffer, 0));
@@ -162,7 +162,8 @@ void VulkanDevice::immediateSubmit(std::function<void(VkCommandBuffer* commandBu
 	VkCommandBufferSubmitInfo commandBufferSubmitInfo = vkinit::CommandBufferSubmitInfo(immCommandBuffer);
 	VkSubmitInfo2 submitInfo = vkinit::SubmitInfo2(&commandBufferSubmitInfo, nullptr, nullptr);
 
-	VK_CHECK(vkQueueSubmit2(*queues[GRAPHICS].get(), 1, &submitInfo, immFence));
+	VK_CHECK(vkQueueSubmit2(*queues[queueType].get(), 1, &submitInfo, immFence));
 
 	VK_CHECK(vkWaitForFences(logicalDevice, 1, &immFence, true, 9999999999));
 }
+
