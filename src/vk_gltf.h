@@ -5,32 +5,72 @@
 #include "vk_initializers.h"
 #include <unordered_map>
 
-struct Scene {
-    std::unordered_map<std::string, std::shared_ptr<Node>> nodes;
-    std::vector<std::shared_ptr<Node>> topNodes;
-    std::unordered_map<std::string, AllocatedImage> images;
-    std::unordered_map<std::string, std::shared_ptr<MaterialReference>> materials;
+
+struct SceneBuffers {
+    AllocatedBuffer indexBuffer;
+    AllocatedBuffer vertexBuffer;
+    VkDeviceAddress vertexBufferAddress;
+
+    void destroy(VulkanDevice* device) { device->destroyBuffer(indexBuffer); device->destroyBuffer(vertexBuffer); };
 };
+
+struct Texture {
+    AllocatedImage* image;
+    VkSampler* sampler;
+};
+
+
+// Contains everything required to render a glTF model in Vulkan
+// This class is heavily simplified (compared to glTF's feature set) but retains the basic glTF structure
+class VulkanGLTFModel {
+public:
+    // The class requires some Vulkan objects so it can create it's own resources
+    VulkanDevice* vulkanDevice;
+    VkQueue copyQueue;
+
+    SceneBuffers SceneBuffers;
+    int indexCount;
+    std::vector<SpecularMaterialReference> materialReference;
+    std::vector<AllocatedImage> images;
+    std::vector<std::shared_ptr<Node>> topNodes;
+
+    std::vector<VkSampler> samplers;
+
+    DescriptorAllocatorGrowable descriptorPool;
+
+    AllocatedBuffer materialDataBuffer;
+    
+
+
+    void init(VulkanDevice* device);
+    void destroy(VulkanDevice* device);
+    void addNodeDraws();
+
+private:
+    void loadImages(VulkanDevice* device, tinygltf::Model& input);
+    void loadTextures(VulkanDevice* device, tinygltf::Model& input);
+    void loadMaterials(VulkanDevice* device, tinygltf::Model& input);
+    void loadNode(VulkanDevice* device, const tinygltf::Node& inputNode, const tinygltf::Model& input, std::shared_ptr<Node> parent, std::vector<uint32_t>& indices, std::vector<Vertex>& vertices);
+};
+
+// Contains data for a single draw call
+struct Primitive {
+    uint32_t firstIndex;
+    uint32_t indexCount;
+    int32_t materialIndex;
+};
+
+struct Mesh {
+    std::vector<Primitive> primitives;
+};
+
+
 
 struct GeometrySurface {
     uint32_t startIndex;
     uint32_t count;
     std::shared_ptr<MaterialReference> material;
 };
-
-struct MeshBuffers {
-    AllocatedBuffer indexBuffer;
-    AllocatedBuffer vertexBuffer;
-    VkDeviceAddress vertexBufferAddress;
-};
-
-struct Mesh {
-    std::string name;
-
-    std::vector<GeoSurface> surfaces;
-    MeshBuffers meshBuffers;
-};
-
 
 struct SceneData {
     glm::mat4 view;
@@ -43,6 +83,7 @@ struct SceneData {
     glm::vec4 sunlightColor;
 };
 
+// A node represents an object in the glTF scene graph
 struct Node: public IRenderable {
     std::weak_ptr<Node> parent;
     std::vector<std::shared_ptr<Node>> children;
