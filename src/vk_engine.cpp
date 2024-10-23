@@ -237,8 +237,20 @@ void VulkanEngine::draw() {
 }
 
 void VulkanEngine::destroy() {
+	for (FrameData frame : framesData) { frame.destroy(&vulkanDevice); }
+
+	vkDestroyDescriptorSetLayout(vulkanDevice.logicalDevice, sceneDataDescriptorLayout, nullptr);
+	vkDestroyDescriptorSetLayout(vulkanDevice.logicalDevice, drawImageDescriptorLayout, nullptr);
+	vkDestroyDescriptorPool(vulkanDevice.logicalDevice, imguiDescriptorPool, nullptr);
+	globalDescriptorAllocator.destroyPools(vulkanDevice.logicalDevice);
+
 	drawImage.destroy(&vulkanDevice);
 	depthImage.destroy(&vulkanDevice);
+	defaultPipeline.destroy(&vulkanDevice);
+	sceneDataBuffer.destroy(&vulkanDevice);
+	vertexBuffer.destroy(&vulkanDevice);
+	indexBuffer.destroy(&vulkanDevice);
+
 	vulkanSwapchain.destroySwapchain(&vulkanDevice);
 	vulkanDevice.destroy();
 	vkb::destroy_debug_utils_messenger(instance, debugMessenger, nullptr);
@@ -372,13 +384,16 @@ void VulkanEngine::initSwapchain() {
 
 void VulkanEngine::initPipelines() {
 
-	if (vkutil::loadShaderModule("../../shaders/draw.frag.spv", vulkanDevice.logicalDevice, &defaultFragmentShader)) {
+	VkShaderModule fragmentShader;
+	VkShaderModule vertexShader;
+
+	if (vkutil::loadShaderModule("../../shaders/draw.frag.spv", vulkanDevice.logicalDevice, &fragmentShader)) {
 		fmt::println("Fragment shader module loaded successfully");
 	}
 	else {
 		fmt::println("Error when building the mesh fragment shader module");
 	}
-	if (vkutil::loadShaderModule("../../shaders/draw.vert.spv", vulkanDevice.logicalDevice, &defaultVertexShader)) {
+	if (vkutil::loadShaderModule("../../shaders/draw.vert.spv", vulkanDevice.logicalDevice, &vertexShader)) {
 		fmt::println("Vertex shader module loaded successfully");
 	}
 	else {
@@ -398,8 +413,8 @@ void VulkanEngine::initPipelines() {
 	pipelineLayoutInfo.pushConstantRangeCount = 1;
 
 	PipelineInfo defaultPipelineInfo = {};
-	defaultPipelineInfo.vertexShader = defaultVertexShader;
-	defaultPipelineInfo.fragmentShader = defaultFragmentShader;
+	defaultPipelineInfo.vertexShader = vertexShader;
+	defaultPipelineInfo.fragmentShader = fragmentShader;
 	defaultPipelineInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	defaultPipelineInfo.mode = VK_POLYGON_MODE_FILL;
 	defaultPipelineInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
@@ -413,8 +428,8 @@ void VulkanEngine::initPipelines() {
 	
 	defaultPipeline.init(&vulkanDevice, defaultPipelineInfo);
 
-	vkDestroyShaderModule(vulkanDevice.logicalDevice, defaultFragmentShader, nullptr);
-	vkDestroyShaderModule(vulkanDevice.logicalDevice, defaultVertexShader, nullptr);
+	vkDestroyShaderModule(vulkanDevice.logicalDevice, fragmentShader, nullptr);
+	vkDestroyShaderModule(vulkanDevice.logicalDevice, vertexShader, nullptr);
 
 }
 
