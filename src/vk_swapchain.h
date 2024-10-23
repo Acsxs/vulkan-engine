@@ -4,7 +4,6 @@
 #include "vk_device.h"
 
 struct VulkanSwapchain {
-	VkSurfaceKHR surface;
 	VkSwapchainKHR swapchain;
 	VkFormat swapchainImageFormat;
 	VkExtent2D swapchainExtent;

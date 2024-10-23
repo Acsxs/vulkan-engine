@@ -18,7 +18,6 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
 
-#include "vk_resources.h"
 
 #define VK_CHECK(x) do { VkResult err = x; if (err) {fmt::println("Detected Vulkan error: {}", string_VkResult(err)); abort(); } } while (0)
 
@@ -28,6 +27,16 @@ constexpr unsigned int FRAMES_IN_FLIGHT = 3;
 struct GlobalGeometryPushConstants {
 	glm::mat4 worldMatrix;
 	VkDeviceAddress vertexBuffer;
+};
+
+struct SceneData{
+    glm::mat4 view;
+    glm::mat4 proj;
+    glm::mat4 viewproj;
+    glm::vec4 viewPos;
+    glm::vec4 ambientColor;
+    glm::vec4 sunlightDirection; // w for sun power
+    glm::vec4 sunlightColor;
 };
 
 struct Vertex {

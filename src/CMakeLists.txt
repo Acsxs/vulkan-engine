@@ -5,8 +5,6 @@ add_executable (engine
   vk_types.h
   vk_descriptors.h
   vk_descriptors.cpp
-  vk_destructor.h
-  vk_destructor.cpp
   vk_device.h
   vk_device.cpp
   vk_engine.h

@@ -86,6 +86,8 @@ void VulkanEngine::init() {
 	
 	camera.pitch = 0;
 	camera.yaw = 0;
+
+	sceneDataBuffer.init(&vulkanDevice, sizeof(SceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 }
 
 void VulkanEngine::run() {
@@ -108,6 +110,17 @@ void VulkanEngine::run() {
 					rendering = true;
 				}
 			}
+
+			if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
+				if (camera.relMouse == false) {
+					SDL_SetRelativeMouseMode(SDL_TRUE);
+					camera.relMouse = true;
+				}
+				else if (camera.relMouse == true) {
+					SDL_SetRelativeMouseMode(SDL_FALSE);
+					camera.relMouse = false;
+				}
+			}
 			camera.processSDLEvent(e);
 		}
 	
@@ -126,6 +139,27 @@ void VulkanEngine::draw() {
 	FrameData* currentFrame = &getCurrentFrameData();
 	currentFrame->frameDescriptors.clearPools(vulkanDevice.logicalDevice);
 	
+
+	camera.update();
+
+	glm::mat4 view = camera.getViewMatrix();
+
+	// camera projection
+	glm::mat4 projection = glm::perspective(glm::radians(70.f), (float)windowExtent.width / (float)windowExtent.height, 10000.f, 0.1f);
+
+
+	projection[1][1] *= -1;
+
+	sceneData.view = view;
+	sceneData.proj = projection;
+	sceneData.viewproj = projection * view;
+	sceneData.viewPos = glm::vec4(camera.position, 0);
+
+	//some default lighting parameters
+	sceneData.ambientColor = glm::vec4(.2f, .2f, .2f, 1.f);
+	sceneData.sunlightColor = glm::vec4(1.f, 1.f, 1.f, 1.f);
+	sceneData.sunlightDirection = glm::vec4(0, -1, -0.5, 10.f);
+
 	
 	uint32_t swapchainImageIndex;
 	VkResult e = vkAcquireNextImageKHR(vulkanDevice.logicalDevice, vulkanSwapchain.swapchain, 1000000000, currentFrame->swapchainSemaphore, nullptr, &swapchainImageIndex);
@@ -154,7 +188,7 @@ void VulkanEngine::draw() {
 	drawImage.transitionImage(&currentFrame->mainCommandBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 	depthImage.transitionImage(&currentFrame->mainCommandBuffer, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
 	
-	drawGeometry(&currentFrame->mainCommandBuffer);
+	drawGeometry(&currentFrame->mainCommandBuffer, currentFrame);
 	
 	drawImage.transitionImage(&currentFrame->mainCommandBuffer, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 	
@@ -192,15 +226,29 @@ void VulkanEngine::draw() {
 }
 
 void VulkanEngine::destroy() {
-	vulkanDevice.destroyImage(drawImage);
-	vulkanDevice.destroyImage(depthImage);
+	drawImage.destroy(&vulkanDevice);
+	depthImage.destroy(&vulkanDevice);
 	vulkanSwapchain.destroySwapchain(&vulkanDevice);
 	vulkanDevice.destroy();
 	vkb::destroy_debug_utils_messenger(instance, debugMessenger, nullptr);
 	vkDestroyInstance(instance, nullptr);
 }
 
-void VulkanEngine::drawGeometry(VkCommandBuffer* commandBuffer) {
+void VulkanEngine::drawGeometry(VkCommandBuffer* commandBuffer, FrameData* frame) {
+
+	//write the buffer
+	SceneData* sceneUniformData = (SceneData*)sceneDataBuffer.allocation->GetMappedData();
+	*sceneUniformData = sceneData;
+
+
+
+	//create a descriptor set that binds that buffer and update it
+	VkDescriptorSet globalDescriptor = frame->frameDescriptors.allocate(vulkanDevice.logicalDevice, sceneDataDescriptorLayout);
+
+	DescriptorWriter writer;
+	writer.writeBuffer(0, sceneDataBuffer.buffer, sizeof(SceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER); // something makes bind 0 a sampler, find it
+	writer.updateSet(vulkanDevice.logicalDevice, globalDescriptor);
+
 	VkRenderingAttachmentInfo colorAttachment = vkinit::RenderingAttachmentInfo(drawImage.imageView, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 	VkRenderingAttachmentInfo depthAttachment = vkinit::DepthAttachmentInfo(depthImage.imageView, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
@@ -225,6 +273,7 @@ void VulkanEngine::drawGeometry(VkCommandBuffer* commandBuffer) {
 	vkCmdBeginRendering(*commandBuffer, &renderInfo);
 
 	vkCmdBindPipeline(*commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, defaultPipeline.pipeline);
+	vkCmdBindDescriptorSets(*commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, defaultPipeline.pipelineLayout, 0, 1, &globalDescriptor, 0, nullptr);
 
 	vkCmdSetViewport(*commandBuffer, 0, 1, &viewport);
 	vkCmdSetScissor(*commandBuffer, 0, 1, &scissor);
@@ -300,12 +349,12 @@ void VulkanEngine::initSwapchain() {
 	VmaAllocationCreateInfo renderImageAllocationCreateInfo = {};
 	renderImageAllocationCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 	renderImageAllocationCreateInfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-	drawImage = vulkanDevice.createImage(drawImageExtent, VK_FORMAT_R16G16B16A16_SFLOAT, drawImageUsages, VK_IMAGE_ASPECT_COLOR_BIT);
+	drawImage.init(&vulkanDevice, drawImageExtent, VK_FORMAT_R16G16B16A16_SFLOAT, drawImageUsages, VK_IMAGE_ASPECT_COLOR_BIT);
 		
 	VkImageUsageFlags depthImageUsages{};
 	depthImageUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 		
-	depthImage = vulkanDevice.createImage(drawImageExtent, VK_FORMAT_D32_SFLOAT, depthImageUsages, VK_IMAGE_ASPECT_DEPTH_BIT);	
+	depthImage.init(&vulkanDevice, drawImageExtent, VK_FORMAT_D32_SFLOAT, depthImageUsages, VK_IMAGE_ASPECT_DEPTH_BIT);
 
 }
 
@@ -341,7 +390,7 @@ void VulkanEngine::initPipelines() {
 	defaultPipelineInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	defaultPipelineInfo.mode = VK_POLYGON_MODE_FILL;
 	defaultPipelineInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
-	defaultPipelineInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	defaultPipelineInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	defaultPipelineInfo.blending = PipelineInfo::NONE;
 	defaultPipelineInfo.colourAttachmentFormat = drawImage.imageFormat;
 	defaultPipelineInfo.depthFormat = depthImage.imageFormat;
@@ -365,6 +414,13 @@ void VulkanEngine::initDescriptors() {
 	};
 
 	globalDescriptorAllocator.init(vulkanDevice.logicalDevice, 10, sizes);
+
+	{
+		DescriptorLayoutBuilder builder;
+		builder.addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+		sceneDataDescriptorLayout = builder.build(vulkanDevice.logicalDevice, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+	}
+
 }
 
 void VulkanEngine::initDummyData() {
@@ -392,14 +448,15 @@ void VulkanEngine::initDummyData() {
 	const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
 	const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
 
-	vertexBuffer = vulkanDevice.createBuffer(vertexBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+	vertexBuffer.init(&vulkanDevice, vertexBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 
 	VkBufferDeviceAddressInfo deviceAdressInfo{ .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,.buffer = vertexBuffer.buffer };
 	vertexBufferAddress = vkGetBufferDeviceAddress(vulkanDevice.logicalDevice, &deviceAdressInfo);
 
-	indexBuffer = vulkanDevice.createBuffer(indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+	indexBuffer.init(&vulkanDevice, indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 
-	AllocatedBuffer staging = vulkanDevice.createBuffer(vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+	AllocatedBuffer staging = {};
+	staging.init(&vulkanDevice, vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
 
 	void* data = staging.allocation->GetMappedData();
 	// copy vertex buffer
@@ -423,5 +480,5 @@ void VulkanEngine::initDummyData() {
 		vkCmdCopyBuffer(*commandBuffer, staging.buffer, indexBuffer.buffer, 1, &indexCopy);
 		});
 
-	vulkanDevice.destroyBuffer(staging);
+	staging.destroy(&vulkanDevice);
 }
