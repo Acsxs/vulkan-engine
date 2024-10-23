@@ -18,6 +18,7 @@
 
 #include <chrono>
 #include <thread>
+#include <iostream>
 
 
 
@@ -82,12 +83,14 @@ void VulkanEngine::init() {
 	}
 	
 	camera.velocity = glm::vec3(0.f);
-	camera.position = glm::vec3(0, 0, 0);
+	camera.position = glm::vec3(1, 0, 0);
 	
 	camera.pitch = 0;
 	camera.yaw = 0;
 
 	sceneDataBuffer.init(&vulkanDevice, sizeof(SceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+	rendering = true;
 }
 
 void VulkanEngine::run() {
@@ -123,8 +126,11 @@ void VulkanEngine::run() {
 			}
 			camera.processSDLEvent(e);
 		}
-	
+		camera.update();
+
+		//std::cout << "(" << camera.position.x << "," << camera.position.y << "," << camera.position.z << ")\n";
 		//do not draw if we are minimized
+		//std::cout << rendering << '\n';
 		if (!rendering) {
 			//throttle the speed to avoid the endless spinning
 			std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -136,10 +142,11 @@ void VulkanEngine::run() {
 }
 
 void VulkanEngine::draw() {
+
 	FrameData* currentFrame = &getCurrentFrameData();
+	VK_CHECK(vkWaitForFences(vulkanDevice.logicalDevice, 1, &currentFrame->renderFence, true, 1000000000));
 	currentFrame->frameDescriptors.clearPools(vulkanDevice.logicalDevice);
 	
-
 	camera.update();
 
 	glm::mat4 view = camera.getViewMatrix();
@@ -222,7 +229,6 @@ void VulkanEngine::draw() {
 	presentInfo.pImageIndices = &swapchainImageIndex;
 	
 	VkResult presentResult = vkQueuePresentKHR(*vulkanDevice.queues[VulkanDevice::GRAPHICS].get(), &presentInfo);
-	
 }
 
 void VulkanEngine::destroy() {
@@ -281,12 +287,13 @@ void VulkanEngine::drawGeometry(VkCommandBuffer* commandBuffer, FrameData* frame
 
 	vkCmdBindIndexBuffer(*commandBuffer, indexBuffer.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-	GlobalGeometryPushConstants pushConstants;
+	GlobalGeometryPushConstants pushConstants = {};
 	pushConstants.vertexBuffer = vertexBufferAddress;
 	pushConstants.worldMatrix = glm::mat4{1.f};
 	vkCmdPushConstants(*commandBuffer, defaultPipeline.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(GlobalGeometryPushConstants), &pushConstants);
 
 	vkCmdDrawIndexed(*commandBuffer, indices.size(), 1, 0, 0, 0);
+	//vkCmdDraw(*commandBuffer, 3, 1, 0, 0);
 
 
 	vkCmdEndRendering(*commandBuffer);
@@ -380,7 +387,8 @@ void VulkanEngine::initPipelines() {
 	
 
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo = vkinit::PipelineLayoutCreateInfo();
-	pipelineLayoutInfo.setLayoutCount = 0;
+	pipelineLayoutInfo.setLayoutCount = 1;
+	pipelineLayoutInfo.pSetLayouts = &sceneDataDescriptorLayout;
 	pipelineLayoutInfo.pPushConstantRanges = &matrixRange;
 	pipelineLayoutInfo.pushConstantRangeCount = 1;
 
@@ -389,8 +397,8 @@ void VulkanEngine::initPipelines() {
 	defaultPipelineInfo.fragmentShader = defaultFragmentShader;
 	defaultPipelineInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	defaultPipelineInfo.mode = VK_POLYGON_MODE_FILL;
-	defaultPipelineInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
-	defaultPipelineInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+	defaultPipelineInfo.cullMode = VK_CULL_MODE_NONE;
+	defaultPipelineInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
 	defaultPipelineInfo.blending = PipelineInfo::NONE;
 	defaultPipelineInfo.colourAttachmentFormat = drawImage.imageFormat;
 	defaultPipelineInfo.depthFormat = depthImage.imageFormat;
