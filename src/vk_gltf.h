@@ -6,9 +6,6 @@
 #include "vk_initializers.h"
 #include <unordered_map>
 
-#define STB_IMAGE_IMPLEMENTATION 
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#define TINYGLTF_IMPLEMENTATION
 #include "tiny_gltf.h"
 
 struct MeshBuffers {
@@ -98,10 +95,9 @@ class VulkanGLTFModel {
 public:
     // The class requires some Vulkan objects so it can create it's own resources
     VulkanDevice* vulkanDevice;
-    VkQueue copyQueue;
 
-    MeshBuffers meshBuffers;
-    int indexCount;
+    MeshBuffers meshBuffers = {};
+    int indexCount = 0;
 
     std::vector<MetallicMaterialInstance> materialReferences;
 

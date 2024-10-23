@@ -14,21 +14,24 @@ void VulkanDevice::init(vkb::PhysicalDevice vkbPhysicalDevice, VkInstance instan
 		std::cerr << "Failed to get graphics queue. Error: " << graphicsQueue.error().message() << "\n";
 		throw;
 	}
+	queues[GRAPHICS] = std::make_shared<VkQueue>(graphicsQueue.value());
+	queueFamilies[GRAPHICS] = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
+
 	auto transferQueue = vkbDevice.get_queue(vkb::QueueType::transfer);
 	if (!transferQueue) {
-		std::cerr << "Failed to get transfer queue. Error: " << transferQueue.error().message() << "\n";
-		queues[1] = queues[0];
-		queueFamilies[1] = queueFamilies[0];
+		std::cerr << "[Warn] Failed to get transfer queue: " << transferQueue.error().message() << "\n";
+		queues[TRANSFER] = queues[GRAPHICS];
+		queueFamilies[TRANSFER] = queueFamilies[GRAPHICS];
 	}
 	else {
-		queues[1] = std::make_shared<VkQueue>(transferQueue.value());
-		queueFamilies[1] = vkbDevice.get_queue_index(vkb::QueueType::transfer).value();
+		queues[TRANSFER] = std::make_shared<VkQueue>(transferQueue.value());
+		queueFamilies[TRANSFER] = vkbDevice.get_queue_index(vkb::QueueType::transfer).value();
 	}
 	auto computeQueue = vkbDevice.get_queue(vkb::QueueType::compute);
 	if (!transferQueue) {
-		std::cerr << "Failed to get compute queue. Error: " << computeQueue.error().message() << "\n";
-		queues[2] = queues[0];
-		queueFamilies[2] = queueFamilies[0];
+		std::cerr << "[Warn] Failed to get compute queue: " << computeQueue.error().message() << "\n";
+		queues[TRANSFER] = queues[GRAPHICS];
+		queueFamilies[TRANSFER] = queueFamilies[GRAPHICS];
 	}
 	else {
 		queues[2] = std::make_shared<VkQueue>(computeQueue.value());
@@ -42,11 +45,21 @@ void VulkanDevice::init(vkb::PhysicalDevice vkbPhysicalDevice, VkInstance instan
 	allocatorCreateInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 	vmaCreateAllocator(&allocatorCreateInfo, &allocator);
 
-	VkCommandPoolCreateInfo commandPoolCreateInfo = vkinit::CommandPoolCreateInfo(getQueueFamilyIndex(GRAPHICS), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
-	VK_CHECK(vkCreateCommandPool(logicalDevice, &commandPoolCreateInfo, nullptr, &immCommandPool));
+	VkCommandPoolCreateInfo graphicsCommandPoolCreateInfo = vkinit::CommandPoolCreateInfo(getQueueFamilyIndex(GRAPHICS), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+	VK_CHECK(vkCreateCommandPool(logicalDevice, &graphicsCommandPoolCreateInfo, nullptr, &immCommandPool[GRAPHICS]));
+	VkCommandBufferAllocateInfo graphicsCommandBufferAllocateInfo = vkinit::CommandBufferAllocateInfo(immCommandPool[GRAPHICS], 1);
+	VK_CHECK(vkAllocateCommandBuffers(logicalDevice, &graphicsCommandBufferAllocateInfo, &immCommandBuffer[GRAPHICS]));
 
-	VkCommandBufferAllocateInfo commandBufferAllocateInfo = vkinit::CommandBufferAllocateInfo(immCommandPool, 1);
-	VK_CHECK(vkAllocateCommandBuffers(logicalDevice, &commandBufferAllocateInfo, &immCommandBuffer));
+	VkCommandPoolCreateInfo transferCommandPoolCreateInfo = vkinit::CommandPoolCreateInfo(getQueueFamilyIndex(TRANSFER), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+	VK_CHECK(vkCreateCommandPool(logicalDevice, &transferCommandPoolCreateInfo, nullptr, &immCommandPool[TRANSFER]));
+	VkCommandBufferAllocateInfo transferCommandBufferAllocateInfo = vkinit::CommandBufferAllocateInfo(immCommandPool[TRANSFER], 1);
+	VK_CHECK(vkAllocateCommandBuffers(logicalDevice, &transferCommandBufferAllocateInfo, &immCommandBuffer[TRANSFER]));
+
+	VkCommandPoolCreateInfo computeCommandPoolCreateInfo = vkinit::CommandPoolCreateInfo(getQueueFamilyIndex(COMPUTE), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+	VK_CHECK(vkCreateCommandPool(logicalDevice, &computeCommandPoolCreateInfo, nullptr, &immCommandPool[COMPUTE]));
+	VkCommandBufferAllocateInfo computeCommandBufferAllocateInfo = vkinit::CommandBufferAllocateInfo(immCommandPool[COMPUTE], 1);
+	VK_CHECK(vkAllocateCommandBuffers(logicalDevice, &computeCommandBufferAllocateInfo, &immCommandBuffer[COMPUTE]));
+
 
 	VkFenceCreateInfo fenceCreateInfo = vkinit::FenceCreateInfo(VK_FENCE_CREATE_SIGNALED_BIT);
 	VkSemaphoreCreateInfo semaphoreCreateInfo = vkinit::SemaphoreCreateInfo();
@@ -55,7 +68,9 @@ void VulkanDevice::init(vkb::PhysicalDevice vkbPhysicalDevice, VkInstance instan
 
 void VulkanDevice::destroy() {
 	vkDeviceWaitIdle(logicalDevice);
-	vkDestroyCommandPool(logicalDevice, immCommandPool, nullptr);
+	for (int i = 0; i < 3; i++) {
+		vkDestroyCommandPool(logicalDevice, immCommandPool[i], nullptr);
+	}
 	vmaDestroyAllocator(allocator);
 	vkDestroyDevice(logicalDevice, nullptr);
 }
@@ -64,17 +79,17 @@ void VulkanDevice::destroy() {
 void VulkanDevice::immediateSubmit(std::function<void(VkCommandBuffer* commandBuffer)>&& function, queueType queueType)
 {
 	VK_CHECK(vkResetFences(logicalDevice, 1, &immFence));
-	VK_CHECK(vkResetCommandBuffer(immCommandBuffer, 0));
+	VK_CHECK(vkResetCommandBuffer(immCommandBuffer[queueType], 0));
 
 	VkCommandBufferBeginInfo cmdBeginInfo = vkinit::CommandBufferBeginInfo(VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT);
 
-	VK_CHECK(vkBeginCommandBuffer(immCommandBuffer, &cmdBeginInfo));
+	VK_CHECK(vkBeginCommandBuffer(immCommandBuffer[queueType], &cmdBeginInfo));
 
-	function(&immCommandBuffer);
+	function(&immCommandBuffer[queueType]);
 
-	VK_CHECK(vkEndCommandBuffer(immCommandBuffer));
+	VK_CHECK(vkEndCommandBuffer(immCommandBuffer[queueType]));
 
-	VkCommandBufferSubmitInfo commandBufferSubmitInfo = vkinit::CommandBufferSubmitInfo(immCommandBuffer);
+	VkCommandBufferSubmitInfo commandBufferSubmitInfo = vkinit::CommandBufferSubmitInfo(immCommandBuffer[queueType]);
 	VkSubmitInfo2 submitInfo = vkinit::SubmitInfo2(&commandBufferSubmitInfo, nullptr, nullptr);
 
 	VK_CHECK(vkQueueSubmit2(*queues[queueType].get(), 1, &submitInfo, immFence));

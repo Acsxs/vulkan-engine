@@ -113,8 +113,8 @@ void VulkanImage::copyToImage(VkCommandBuffer* commandBuffer, VkImage* destinati
 
 void VulkanBuffer::copyToBuffer(VkCommandBuffer* commandBuffer, VulkanBuffer* dstBuffer, size_t size, uint32_t srcOffset, uint32_t dstOffset) {
     VkBufferCopy bufferCopy{ 0 };
-    bufferCopy.dstOffset = srcOffset;
-    bufferCopy.srcOffset = dstOffset;
+    bufferCopy.dstOffset = dstOffset;
+    bufferCopy.srcOffset = srcOffset;
     bufferCopy.size = size;
 
     vkCmdCopyBuffer(*commandBuffer, buffer, dstBuffer->buffer, 1, &bufferCopy);
@@ -144,15 +144,19 @@ void AllocatedBuffer::init(VulkanDevice* device, size_t allocSize, VkBufferUsage
     bufferCreateInfo.pNext = nullptr;
     bufferCreateInfo.size = allocSize;
     bufferCreateInfo.usage = usage;
+
     VmaAllocationCreateInfo bufferAllocationCreateInfo = {};
     bufferAllocationCreateInfo.usage = memoryUsage;
     bufferAllocationCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
     // allocate the buffer
     VK_CHECK(vmaCreateBuffer(device->allocator, &bufferCreateInfo, &bufferAllocationCreateInfo, &buffer, &allocation, &info));
 }
+
 void AllocatedBuffer::destroy(VulkanDevice* device) {
     vmaDestroyBuffer(device->allocator, buffer, allocation);
 }
+
+
 void AllocatedImage::init(VulkanDevice* device, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool mipmapped)
 {
     imageFormat = format;
@@ -179,6 +183,7 @@ void AllocatedImage::init(VulkanDevice* device, VkExtent3D size, VkFormat format
     view_info.subresourceRange.levelCount = img_info.mipLevels;
     VK_CHECK(vkCreateImageView(device->logicalDevice, &view_info, nullptr, &imageView));
 }
+
 void AllocatedImage::init(VulkanDevice* device, void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool mipmapped)
 {
     size_t dataSize = size.depth * size.width * size.height * 4;
@@ -189,6 +194,7 @@ void AllocatedImage::init(VulkanDevice* device, void* data, VkExtent3D size, VkF
     device->immediateSubmit([&](VkCommandBuffer* commandBuffer) { uploadBuffer.copyToImage(commandBuffer, this, 0, 0, 0, aspect, size); }, VulkanDevice::TRANSFER);
     uploadBuffer.destroy(device);
 }
+
 void AllocatedImage::destroy(VulkanDevice* device)
 {
     vkDestroyImageView(device->logicalDevice, imageView, nullptr);

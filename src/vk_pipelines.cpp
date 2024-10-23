@@ -54,22 +54,23 @@ VkPipeline vkutil::buildPipeline(VulkanDevice* device, VkPipelineLayout layout, 
     shaderStages.push_back(vkinit::PipelineShaderStageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT, info.fragmentShader));
 
 
-    VkPipelineInputAssemblyStateCreateInfo inputAssembly;
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly = { .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
     inputAssembly.topology = info.topology;
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
-    VkPipelineRasterizationStateCreateInfo rasterizer;
+    VkPipelineRasterizationStateCreateInfo rasterizer = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
     rasterizer.polygonMode = info.mode;
     rasterizer.lineWidth = 1.f;
     rasterizer.cullMode = info.cullMode;
     rasterizer.frontFace = info.frontFace;
 
-    VkPipelineColorBlendAttachmentState colorBlendAttachment;
+    VkPipelineColorBlendAttachmentState colorBlendAttachment = {};
     colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     if (info.blending == PipelineInfo::NONE) {
         colorBlendAttachment.blendEnable = VK_FALSE;
     }
     else if (info.blending == PipelineInfo::ADDITIVE) {
+        // destination is current colour + (new colour* new color alpha)
         colorBlendAttachment.blendEnable = VK_TRUE;
         colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
         colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
@@ -79,6 +80,7 @@ VkPipeline vkutil::buildPipeline(VulkanDevice* device, VkPipelineLayout layout, 
         colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
     }
     else if (info.blending == PipelineInfo::ALPHA) {
+        // destination is (current colour*(1-new color alpha)) + (new colour* new color alpha)
         colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
         colorBlendAttachment.blendEnable = VK_TRUE;
         colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
@@ -89,7 +91,8 @@ VkPipeline vkutil::buildPipeline(VulkanDevice* device, VkPipelineLayout layout, 
         colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
     }
 
-    VkPipelineMultisampleStateCreateInfo multisampling;
+    // No multisampling
+    VkPipelineMultisampleStateCreateInfo multisampling = { .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
     multisampling.sampleShadingEnable = VK_FALSE;
     multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
     multisampling.minSampleShading = 1.0f;
@@ -97,7 +100,7 @@ VkPipeline vkutil::buildPipeline(VulkanDevice* device, VkPipelineLayout layout, 
     multisampling.alphaToCoverageEnable = VK_FALSE;
     multisampling.alphaToOneEnable = VK_FALSE;
 
-    VkPipelineDepthStencilStateCreateInfo depthStencil;
+    VkPipelineDepthStencilStateCreateInfo depthStencil = { .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
     depthStencil.depthTestEnable = VK_TRUE;
     depthStencil.depthWriteEnable = info.depthWriteEnable;
     depthStencil.depthCompareOp = info.depthCompareOperation;
@@ -108,13 +111,10 @@ VkPipeline vkutil::buildPipeline(VulkanDevice* device, VkPipelineLayout layout, 
     depthStencil.minDepthBounds = 0.f;
     depthStencil.maxDepthBounds = 1.f;
 
-    VkPipelineRenderingCreateInfo renderInfo;
-    renderInfo.depthAttachmentFormat = info.depthFormat;
+    VkPipelineRenderingCreateInfo renderInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
     renderInfo.colorAttachmentCount = 1;
     renderInfo.pColorAttachmentFormats = &info.colourAttachmentFormat;
-
-
-
+    renderInfo.depthAttachmentFormat = info.depthFormat;
 
 
 
@@ -169,7 +169,6 @@ VkPipeline vkutil::buildPipeline(VulkanDevice* device, VkPipelineLayout layout, 
         return newPipeline;
     }
 };
-
 void VulkanPipeline::init(VulkanDevice* device, PipelineInfo info) {
     VK_CHECK(vkCreatePipelineLayout(device->logicalDevice, &info.pipelineLayoutInfo, nullptr, &pipelineLayout));
     pipeline = vkutil::buildPipeline(device, pipelineLayout, info);

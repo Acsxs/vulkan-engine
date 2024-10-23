@@ -4,7 +4,6 @@
 #include "vk_types.h"
 #include "vk_initializers.h"
 
-#include "vk_mem_alloc.h"
 
 
 class VulkanDevice {
@@ -17,8 +16,8 @@ public:
 	VmaAllocator allocator;
 
 	VkFence immFence;
-	VkCommandBuffer immCommandBuffer;
-	VkCommandPool immCommandPool;
+	VkCommandBuffer immCommandBuffer[3];
+	VkCommandPool immCommandPool[3];
 
 	VkPhysicalDevice physicalDevice;
 	VkDevice logicalDevice;

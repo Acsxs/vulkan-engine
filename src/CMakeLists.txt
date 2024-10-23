@@ -23,6 +23,8 @@ add_executable (engine
   vk_swapchain.cpp 
   camera.cpp
   camera.h
+  VmaUsage.h
+  VmaUsage.cpp
 )
 
 set_property(TARGET engine PROPERTY CXX_STANDARD 20)

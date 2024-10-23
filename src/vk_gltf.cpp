@@ -1,8 +1,11 @@
-#include "vk_gltf.h"
-
-
-
 #include "vk_device.h"
+
+#define STB_IMAGE_IMPLEMENTATION 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define TINYGLTF_IMPLEMENTATION
+
+
+#include "vk_gltf.h"
 
 VkFilter getVkFilterMode(int32_t filterMode)
 {
@@ -47,24 +50,42 @@ void VulkanGLTFModel::init(VulkanDevice* device, std::string filename, MetallicR
 	tinygltf::TinyGLTF gltfContext;
 	std::string error, warning;
 
-	bool fileLoaded = gltfContext.LoadASCIIFromFile(&glTFInput, &error, &warning, filename);
+	bool fileLoaded;
+	if (filename.substr(filename.length() - 3, 3) == "glb"){
+		fileLoaded = gltfContext.LoadBinaryFromFile(&glTFInput, &error, &warning, filename);
+	}
+	else if (filename.substr(filename.length() - 4, 4) == "gltf") {
+		fileLoaded = gltfContext.LoadASCIIFromFile(&glTFInput, &error, &warning, filename);
+	}
+	else {
+		std::cerr <<"File format not supported\n";
+		throw;
+	}
 
 
-	std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes = {
-		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3 },
-		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 },
-		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1 }
-	};
 
-	descriptorPool.init(device, materialReferences.size(), sizes);
+	uint32_t black = glm::packUnorm4x8(glm::vec4(0, 0, 0, 1));
+	uint32_t magenta = glm::packUnorm4x8(glm::vec4(1, 0, 1, 1));
+	std::array<uint32_t, 16 * 16 > pixels; //for 16x16 checkerboard texture
+	for (int x = 0; x < 16; x++) {
+		for (int y = 0; y < 16; y++) {
+			pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
+		}
+	}
+	defaultImage.init(device, pixels.data(), VkExtent3D{ 16, 16, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+	VkSamplerCreateInfo defaultSamplerInfo = { .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+	defaultSamplerInfo.magFilter = VK_FILTER_NEAREST;
+	defaultSamplerInfo.minFilter = VK_FILTER_NEAREST;
+	vkCreateSampler(device->logicalDevice, &defaultSamplerInfo, nullptr, &defaultSampler);
 
 	std::vector<uint32_t> indices;
 	std::vector<Vertex> vertices;
 
 	if (fileLoaded) {
 		loadImages(device, glTFInput);
-		loadMaterials(device, glTFInput,  writer);
+		loadSamplers(device, glTFInput);
 		loadTextures(device, glTFInput);
+		loadMaterials(device, glTFInput,  writer);
 		const tinygltf::Scene& scene = glTFInput.scenes[0];
 		for (size_t i = 0; i < scene.nodes.size(); i++) {
 			const tinygltf::Node node = glTFInput.nodes[scene.nodes[i]];
@@ -79,11 +100,17 @@ void VulkanGLTFModel::init(VulkanDevice* device, std::string filename, MetallicR
 		throw;
 	}
 
+	std::cout << indices.size() << "\n";
+	std::cout << vertices.size() << "\n";
+
 	const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
 	const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
 
-	meshBuffers.indexBuffer.init(device, vertexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
-	meshBuffers.vertexBuffer.init(device, indexBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+	std::cout << vertexBufferSize << "\n";
+	std::cout << indexBufferSize << "\n";
+
+	meshBuffers.vertexBuffer.init(device, vertexBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+	meshBuffers.indexBuffer.init(device, indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 
 	VkBufferDeviceAddressInfo deviceAdressInfo{ .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,.buffer = meshBuffers.vertexBuffer.buffer };
 	meshBuffers.vertexBufferAddress = vkGetBufferDeviceAddress(device->logicalDevice, &deviceAdressInfo);
@@ -91,32 +118,24 @@ void VulkanGLTFModel::init(VulkanDevice* device, std::string filename, MetallicR
 	AllocatedBuffer staging = {};
 	staging.init(device, vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
 
-	void* data = staging.allocation->GetMappedData();
-
+	std::cout << indexBufferSize+ vertexBufferSize << "\n";
+	void* data;
+	vmaMapMemory(device->allocator, staging.allocation, &data);
 	// copy vertex buffer
 	memcpy(data, vertices.data(), vertexBufferSize);
 	// copy index buffer
 	memcpy((char*)data + vertexBufferSize, indices.data(), indexBufferSize);
 
 	device->immediateSubmit([&](VkCommandBuffer* commandBuffer) {
-		VkBufferCopy vertexCopy{ 0 };
-		vertexCopy.dstOffset = 0;
-		vertexCopy.srcOffset = 0;
-		vertexCopy.size = vertexBufferSize;
-
-		vkCmdCopyBuffer(*commandBuffer, staging.buffer, meshBuffers.vertexBuffer.buffer, 1, &vertexCopy);
-
-		VkBufferCopy indexCopy{ 0 };
-		indexCopy.dstOffset = 0;
-		indexCopy.srcOffset = vertexBufferSize;
-		indexCopy.size = indexBufferSize;
-
-		vkCmdCopyBuffer(*commandBuffer, staging.buffer, meshBuffers.indexBuffer.buffer, 1, &indexCopy);
+		staging.copyToBuffer(commandBuffer, &meshBuffers.vertexBuffer, vertexBufferSize, 0, 0);
+		staging.copyToBuffer(commandBuffer, &meshBuffers.indexBuffer, indexBufferSize, vertexBufferSize, 0);
 		}, 
 		VulkanDevice::TRANSFER
 	);
 
+	vmaUnmapMemory(device->allocator, staging.allocation);
 	staging.destroy(device);
+
 }
 
 void VulkanGLTFModel::loadImages(VulkanDevice* device, tinygltf::Model& input)
@@ -151,7 +170,7 @@ void VulkanGLTFModel::loadImages(VulkanDevice* device, tinygltf::Model& input)
 		}
 		// Load texture from image buffer
 		
-		images[i].init(device, bufferData, VkExtent3D{ (uint16_t)glTFImage.width,(uint16_t)glTFImage.height, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
+		images[i].init(device, bufferData, VkExtent3D{ (uint16_t)glTFImage.width,(uint16_t)glTFImage.height, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 		if (deleteBuffer) {
 			delete[] bufferData;
 		}
@@ -179,8 +198,6 @@ void VulkanGLTFModel::loadSamplers(VulkanDevice* device, tinygltf::Model& input)
 		samplerInfo.maxAnisotropy = 1.0;
 		samplerInfo.anisotropyEnable = VK_FALSE;
 		samplerInfo.maxLod = 1.0;
-		samplerInfo.maxAnisotropy = 8.0f;
-		samplerInfo.anisotropyEnable = VK_TRUE;
 
 		samplerInfos[i] = samplerInfo;
 	}
@@ -214,6 +231,7 @@ void VulkanGLTFModel::loadTextures(VulkanDevice* device, tinygltf::Model& input)
 		}
 		else {
 			samplerInfo = samplerInfos[texture.sampler];
+
 		}
 
 		VK_CHECK(vkCreateSampler(device->logicalDevice, &samplerInfo, nullptr, &textures[i].sampler));
@@ -222,21 +240,17 @@ void VulkanGLTFModel::loadTextures(VulkanDevice* device, tinygltf::Model& input)
 
 void VulkanGLTFModel::loadMaterials(VulkanDevice* device, tinygltf::Model& input, MetallicRoughnessMaterialWriter writer)
 {
-	uint32_t black = glm::packUnorm4x8(glm::vec4(0, 0, 0, 1));
-	uint32_t magenta = glm::packUnorm4x8(glm::vec4(1, 0, 1, 1));
-	std::array<uint32_t, 16 * 16 > pixels; //for 16x16 checkerboard texture
-	for (int x = 0; x < 16; x++) {
-		for (int y = 0; y < 16; y++) {
-			pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
-		}
-	}
-	defaultImage.init(device, pixels.data(), VkExtent3D{ 16, 16, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
-	VkSamplerCreateInfo defaultSamplerInfo = { .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
-	defaultSamplerInfo.magFilter = VK_FILTER_NEAREST;
-	defaultSamplerInfo.minFilter = VK_FILTER_NEAREST;
-	vkCreateSampler(device->logicalDevice, &defaultSamplerInfo, nullptr, &defaultSampler);
+
 
 	materialReferences.resize(input.materials.size());
+
+	std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes = {
+		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3 },
+		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 },
+		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1 }
+	};
+	descriptorPool.init(device, materialReferences.size(), sizes);
+
 	materialDataBuffer.init(device, sizeof(MetallicMaterialConstants) * input.materials.size(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 	int data_index = 0;
 
@@ -245,7 +259,7 @@ void VulkanGLTFModel::loadMaterials(VulkanDevice* device, tinygltf::Model& input
 		// We only read the most basic properties required for our sample
 		tinygltf::Material material = input.materials[i];
 
-		MetallicMaterialConstants constants;
+		MetallicMaterialConstants constants = { .baseColorFactors = glm::vec4 {1.f} , .metallicRoughnessFactors = glm::vec4 {0.f} };
 		if (material.values.find("baseColorFactor") != material.values.end()) {
 			constants.baseColorFactors = glm::make_vec4(material.values["baseColorFactor"].ColorFactor().data());
 		}
@@ -268,6 +282,7 @@ void VulkanGLTFModel::loadMaterials(VulkanDevice* device, tinygltf::Model& input
 		materialResources.dataBuffer = materialDataBuffer.buffer;
 		materialResources.dataBufferOffset = data_index * sizeof(MetallicMaterialConstants);
 		// grab textures from gltf file
+
 		if (material.values.find("baseColorTexture") != material.values.end()) {
 			materialResources.baseColourImage = *textures[material.values["baseColorTexture"].TextureIndex()].image;
 			materialResources.baseColourSampler = textures[material.values["baseColorTexture"].TextureIndex()].sampler;
