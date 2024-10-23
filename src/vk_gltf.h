@@ -99,7 +99,8 @@ public:
     MeshBuffers meshBuffers = {};
     int indexCount = 0;
 
-    std::vector<MetallicMaterialInstance> materialReferences;
+    std::vector<MetallicMaterialInstance> materialInstances;
+    MetallicMaterialInstance defaultMaterialInstance;
 
     std::vector<AllocatedImage> images;
     std::vector<VkSamplerCreateInfo> samplerInfos;

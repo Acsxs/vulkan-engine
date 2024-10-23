@@ -240,18 +240,16 @@ void VulkanGLTFModel::loadTextures(VulkanDevice* device, tinygltf::Model& input)
 
 void VulkanGLTFModel::loadMaterials(VulkanDevice* device, tinygltf::Model& input, MetallicRoughnessMaterialWriter writer)
 {
-
-
-	materialReferences.resize(input.materials.size());
+	materialInstances.resize(input.materials.size());
 
 	std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> sizes = {
 		{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 3 },
 		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 },
 		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1 }
 	};
-	descriptorPool.init(device, materialReferences.size(), sizes);
+	descriptorPool.init(device, materialInstances.size()+1, sizes);
 
-	materialDataBuffer.init(device, sizeof(MetallicMaterialConstants) * input.materials.size(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+	materialDataBuffer.init(device, sizeof(MetallicMaterialConstants) * (input.materials.size()+1), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 	int data_index = 0;
 
 	MetallicMaterialConstants* sceneMaterialConstants = (MetallicMaterialConstants*)materialDataBuffer.info.pMappedData;
@@ -259,7 +257,7 @@ void VulkanGLTFModel::loadMaterials(VulkanDevice* device, tinygltf::Model& input
 		// We only read the most basic properties required for our sample
 		tinygltf::Material material = input.materials[i];
 
-		MetallicMaterialConstants constants = { .baseColorFactors = glm::vec4 {1.f} , .metallicRoughnessFactors = glm::vec4 {0.f} };
+		MetallicMaterialConstants constants = { .baseColorFactors = glm::vec4{ 1,1,1,1 } , .metallicRoughnessFactors = glm::vec4{ 1,0.5,0,0 } };
 		if (material.values.find("baseColorFactor") != material.values.end()) {
 			constants.baseColorFactors = glm::make_vec4(material.values["baseColorFactor"].ColorFactor().data());
 		}
@@ -295,10 +293,25 @@ void VulkanGLTFModel::loadMaterials(VulkanDevice* device, tinygltf::Model& input
 		if (material.alphaMode == "BLEND") {
 			passType = MaterialPassType::Transparent;
 		}
-			materialReferences[i] = writer.writeMaterialInstance(device, passType, materialResources, descriptorPool);
+			materialInstances[i] = writer.writeMaterialInstance(device, passType, materialResources, descriptorPool);
 
 			data_index++;
 	}
+
+	MetallicMaterialResources materialResources;
+	// default the material textures
+	materialResources.baseColourImage = defaultImage;
+	materialResources.baseColourSampler = defaultSampler;
+	materialResources.metallicRoughnessImage = defaultImage;
+	materialResources.metallicRoughnessSampler = defaultSampler;
+
+	// set the uniform buffer for the material data
+	materialResources.dataBuffer = materialDataBuffer.buffer;
+	materialResources.dataBufferOffset = data_index * sizeof(MetallicMaterialConstants);
+	MetallicMaterialConstants constants = { .baseColorFactors = glm::vec4{ 1,1,1,1 } , .metallicRoughnessFactors = glm::vec4{ 1,0.5,0,0 } };
+	sceneMaterialConstants[data_index] = constants;
+	defaultMaterialInstance = writer.writeMaterialInstance(device, MaterialPassType::MainColour, materialResources, descriptorPool);
+	
 }
 
 void VulkanGLTFModel::loadNode(const tinygltf::Node& inputNode, const tinygltf::Model& input, std::shared_ptr<Node> parent, std::vector<uint32_t>& indices, std::vector<Vertex>& vertices)
@@ -469,8 +482,12 @@ void MeshNode::appendDraw(VulkanGLTFModel* model, const glm::mat4& topMatrix, Dr
 		def.indexCount = s.indexCount;
 		def.firstIndex = s.firstIndex;
 		def.indexBuffer = model->meshBuffers.indexBuffer.buffer;
-		def.material = &model->materialReferences[s.materialIndex];
-
+		if (s.materialIndex == -1) {
+			def.material = &model->defaultMaterialInstance;
+		}
+		else {
+			def.material = &model->materialInstances[s.materialIndex]; //issue m index -1
+		}
 		def.transform = nodeMatrix;
 		def.vertexBufferAddress = model->meshBuffers.vertexBufferAddress;
 
