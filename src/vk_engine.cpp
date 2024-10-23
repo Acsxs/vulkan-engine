@@ -99,6 +99,9 @@ void VulkanEngine::run() {
 	//main loop
 	while (!bQuit)
 	{
+
+		auto start = std::chrono::system_clock::now();
+
 		//Handle events on queue
 		while (SDL_PollEvent(&e) != 0) {
 			//close the window when user alt-f4s or clicks the X button			
@@ -138,6 +141,15 @@ void VulkanEngine::run() {
 		}
 		draw();
 		frameCount++;
+
+
+		//get clock again, compare with start clock
+		auto end = std::chrono::system_clock::now();
+
+		//convert to microseconds (integer), and then come back to miliseconds
+		auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+		deltaTime = elapsed.count() / 1000.f;
+		runtime += deltaTime/1000.f;
 	}
 }
 
@@ -155,12 +167,13 @@ void VulkanEngine::draw() {
 	// camera projection
 	glm::mat4 projection = glm::perspective(glm::radians(70.f), (float)windowExtent.width / (float)windowExtent.height, 10000.f, 0.1f);
 
+	glm::mat4 rotation = glm::rotate(2.f* runtime, glm::vec3(0.f, 1.f, 0.f));
 
 	projection[1][1] *= -1;
 
 	sceneData.view = view;
-	sceneData.proj = projection;
-	sceneData.viewproj = projection * view;
+	sceneData.proj = projection * rotation;
+	sceneData.viewproj = projection * view * rotation ;
 	sceneData.viewPos = glm::vec4(camera.position, 0);
 
 	//some default lighting parameters

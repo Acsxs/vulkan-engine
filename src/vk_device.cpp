@@ -12,31 +12,32 @@ void VulkanDevice::init(vkb::PhysicalDevice vkbPhysicalDevice, VkInstance instan
 
 	auto graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics);
 	if (!graphicsQueue) {
-		std::cerr << "Failed to get graphics queue. Error: " << graphicsQueue.error().message() << "\n";
+		std::cerr << "[Fatal Errpr] Failed to get graphics queue: " << graphicsQueue.error().message() << "\n";
 		throw;
 	}
-	queues[0] = std::make_shared<VkQueue>(graphicsQueue.value());
-	queueFamilies[0] = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
+	queues[GRAPHICS] = std::make_shared<VkQueue>(graphicsQueue.value());
+	queueFamilies[GRAPHICS] = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
 
-	auto transferQueue = vkbDevice.get_queue(vkb::QueueType::transfer); 
+	auto transferQueue = vkbDevice.get_queue(vkb::QueueType::transfer);
 	if (!transferQueue) {
 		std::cerr << "[Warn] Failed to get transfer queue: " << transferQueue.error().message() << "\n";
-		queues[1] = queues[0];
-		queueFamilies[1] = queueFamilies[0];
+		queues[TRANSFER] = queues[GRAPHICS];
+		queueFamilies[TRANSFER] = queueFamilies[GRAPHICS];
 	}
 	else {
-		queues[1] = std::make_shared<VkQueue>(transferQueue.value());
-		queueFamilies[1] = vkbDevice.get_queue_index(vkb::QueueType::transfer).value();
+		queues[TRANSFER] = std::make_shared<VkQueue>(transferQueue.value());
+		queueFamilies[TRANSFER] = vkbDevice.get_queue_index(vkb::QueueType::transfer).value();
 	}
+
 	auto computeQueue = vkbDevice.get_queue(vkb::QueueType::compute);
 	if (!transferQueue) {
 		std::cerr << "[Warn] Failed to get compute queue: " << computeQueue.error().message() << "\n";
-		queues[2] = queues[0];
-		queueFamilies[2] = queueFamilies[0];
+		queues[COMPUTE] = queues[GRAPHICS];
+		queueFamilies[COMPUTE] = queueFamilies[GRAPHICS];
 	}
 	else {
-		queues[2] = std::make_shared<VkQueue>(computeQueue.value());
-		queueFamilies[2] = vkbDevice.get_queue_index(vkb::QueueType::compute).value();
+		queues[COMPUTE] = std::make_shared<VkQueue>(computeQueue.value());
+		queueFamilies[COMPUTE] = vkbDevice.get_queue_index(vkb::QueueType::compute).value();
 	}
 
 	VmaAllocatorCreateInfo allocatorCreateInfo = {};

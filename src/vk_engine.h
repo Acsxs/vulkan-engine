@@ -30,6 +30,7 @@ class VulkanEngine {
 public:
 	uint64_t frameCount;
 	float deltaTime;
+	float runtime = 0;
 	bool rendering{ false };
 
 	VkExtent2D windowExtent{ 1920 , 1080 };
