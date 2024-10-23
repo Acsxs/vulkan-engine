@@ -93,9 +93,6 @@ struct MeshNode : public Node {
 // This class is heavily simplified (compared to glTF's feature set) but retains the basic glTF structure
 class VulkanGLTFModel {
 public:
-    // The class requires some Vulkan objects so it can create it's own resources
-    VulkanDevice* vulkanDevice;
-
     MeshBuffers meshBuffers = {};
     int indexCount = 0;
 
