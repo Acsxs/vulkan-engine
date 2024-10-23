@@ -25,7 +25,7 @@ void VulkanDevice::init(vkb::PhysicalDevice vkbPhysicalDevice, VkInstance instan
 
 	auto transferQueue = vkbDevice.get_queue(vkb::QueueType::transfer);
 	if (!transferQueue) {
-		std::cerr << "[Warn] Failed to get transfer queue: " << transferQueue.error().message() << "\n";
+		std::cerr << "Failed to get transfer queue. Error: " << transferQueue.error().message() << "\n";
 		queues[1] = queues[0];
 		queueFamilies[1] = queueFamilies[0];
 	}
@@ -36,7 +36,7 @@ void VulkanDevice::init(vkb::PhysicalDevice vkbPhysicalDevice, VkInstance instan
 
 	auto computeQueue = vkbDevice.get_queue(vkb::QueueType::compute);
 	if (!transferQueue) {
-		std::cerr << "[Warn] Failed to get compute queue: " << computeQueue.error().message() << "\n";
+		std::cerr << "Failed to get compute queue. Error: " << computeQueue.error().message() << "\n";
 		queues[2] = queues[0];
 		queueFamilies[2] = queueFamilies[0];
 	}
