@@ -25,6 +25,7 @@ struct VulkanImage {
         VkAccessFlagBits2 srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT,
         VkAccessFlagBits2 dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT
     );
+
     void copyToImage(VkCommandBuffer* commandBuffer, VkImage* destination, VkExtent3D dstSize, VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT);
     void copyToImage(VkCommandBuffer* commandBuffer, VkImage* destination, VkExtent2D dstSize, VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT);
 };

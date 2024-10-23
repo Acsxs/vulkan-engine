@@ -1,6 +1,5 @@
 #include "vk_resources.h"
 
-
 void VulkanImage::transitionImage(
     VkCommandBuffer* commandBuffer,
     VkImageLayout newLayout,
@@ -43,6 +42,8 @@ void VulkanImage::transitionImage(
 
     imageLayout = newLayout;
 }
+
+
 
 void VulkanImage::copyToImage(VkCommandBuffer* commandBuffer, VkImage* destination, VkExtent3D dstSize, VkImageAspectFlags aspectMask)
 {

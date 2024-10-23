@@ -143,6 +143,7 @@ void VulkanEngine::run() {
 
 void VulkanEngine::draw() {
 
+	VkClearColorValue clearColour = { .float32 = {0.0, 0.0, 0.0} };
 	FrameData* currentFrame = &getCurrentFrameData();
 	VK_CHECK(vkWaitForFences(vulkanDevice.logicalDevice, 1, &currentFrame->renderFence, true, 1000000000));
 	currentFrame->frameDescriptors.clearPools(vulkanDevice.logicalDevice);
@@ -186,12 +187,16 @@ void VulkanEngine::draw() {
 	
 	drawExtent.width = drawImage.imageExtent.width;
 	drawExtent.height = drawImage.imageExtent.height;
-	
-
 
 
 	VK_CHECK(vkBeginCommandBuffer(currentFrame->mainCommandBuffer, &commandBufferBeginInfo));
-	
+
+	drawImage.transitionImage(&currentFrame->mainCommandBuffer, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+	VkImageSubresourceRange imageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+	vkCmdClearColorImage(currentFrame->mainCommandBuffer, drawImage.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearColour, 1, &imageSubresourceRange);
+
+
 	drawImage.transitionImage(&currentFrame->mainCommandBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 	depthImage.transitionImage(&currentFrame->mainCommandBuffer, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT);
 	
@@ -397,7 +402,7 @@ void VulkanEngine::initPipelines() {
 	defaultPipelineInfo.fragmentShader = defaultFragmentShader;
 	defaultPipelineInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 	defaultPipelineInfo.mode = VK_POLYGON_MODE_FILL;
-	defaultPipelineInfo.cullMode = VK_CULL_MODE_NONE;
+	defaultPipelineInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
 	defaultPipelineInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
 	defaultPipelineInfo.blending = PipelineInfo::NONE;
 	defaultPipelineInfo.colourAttachmentFormat = drawImage.imageFormat;
