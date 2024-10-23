@@ -83,7 +83,7 @@ void VulkanEngine::init() {
 	}
 	
 	camera.velocity = glm::vec3(0.f);
-	camera.position = glm::vec3(1, 0, 0);
+	camera.position = glm::vec3(0, 0, 5);
 	
 	camera.pitch = 0;
 	camera.yaw = 0;
