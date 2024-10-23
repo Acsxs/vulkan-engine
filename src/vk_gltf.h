@@ -2,8 +2,14 @@
 
 #include <VkBootstrap.h>
 #include "vk_types.h"
+#include "vk_material.h"
 #include "vk_initializers.h"
 #include <unordered_map>
+
+#define STB_IMAGE_IMPLEMENTATION 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define TINYGLTF_IMPLEMENTATION
+#include "tiny_gltf.h"
 
 
 struct MeshBuffers {

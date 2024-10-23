@@ -25,7 +25,6 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
 
-#include "vk_material.h"
 #include <iostream>
 
 
@@ -33,7 +32,7 @@
 
 constexpr unsigned int FRAMES_IN_FLIGHT = 3;
 
-
+struct MaterialInstance;
 
 struct Vertex {
 
@@ -42,15 +41,6 @@ struct Vertex {
     glm::vec3 normal;
     float uv_y;
     glm::vec4 color;
-};
-
-struct SceneData {
-    glm::mat4 view;
-    glm::mat4 proj;
-    glm::mat4 viewproj;
-    glm::vec4 ambientColor;
-    glm::vec4 sunlightDirection; // w for sun power
-    glm::vec4 sunlightColor;
 };
 
 struct DrawPushConstants {

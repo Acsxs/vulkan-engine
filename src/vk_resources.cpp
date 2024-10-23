@@ -1,5 +1,4 @@
 #include "vk_resources.h"
-#include "vk_device.h"
 
 void VulkanImage::transitionImage(
     VkCommandBuffer* commandBuffer,

@@ -3,8 +3,9 @@
 
 #pragma once
 
-#include "vk_device.h"
 #include "vk_types.h"
+#include "vk_device.h"
+#include "vk_resources.h"
 #include "vk_descriptors.h"
 #include "vk_gltf.h"
 #include "vk_swapchain.h"
@@ -139,8 +140,6 @@ struct FrameData {
 class VulkanEngine {
 public:
 	uint64_t frameCount;
-	std::chrono::system_clock::time_point startTime;
-	std::chrono::system_clock::time_point previousFrameEnd;
 	float deltaTime;
 	bool rendering{ false };
 
@@ -148,9 +147,9 @@ public:
 	struct SDL_Window* window{ nullptr };
 
 	VkInstance instance;
-	VkDebugUtilsMessengerEXT debug_messenger;
+	VkDebugUtilsMessengerEXT debugMessenger;
 	VulkanDevice vulkanDevice;
-	VulkanSwapchain swapchain;
+	VulkanSwapchain vulkanSwapchain;
 	VkSurfaceKHR surface;
 
 	FrameData framesData[FRAMES_IN_FLIGHT];

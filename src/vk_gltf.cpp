@@ -1,9 +1,6 @@
 #include "vk_gltf.h"
 
-#define STB_IMAGE_IMPLEMENTATION 
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#define TINYGLTF_IMPLEMENTATION
-#include "tiny_gltf.h"
+
 
 #include "vk_device.h"
 
@@ -445,7 +442,7 @@ void VulkanGLTFModel::destroy(VulkanDevice* device) {
 	defaultImage.destroy(device);
 	vkDestroySampler(device->logicalDevice, defaultSampler, nullptr);
 	materialDataBuffer.destroy(device);
-	descriptorPool.destroyPools(device->logicalDevice);
+	descriptorPool.destroyPools(device);
 }
 
 

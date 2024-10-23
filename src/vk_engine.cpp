@@ -976,6 +976,31 @@ using namespace std;
 
 
 
+void FrameData::init(VulkanDevice* device) {
+
+	VkCommandPoolCreateInfo commandPoolCreateInfo = vkinit::CommandPoolCreateInfo(device->getQueueFamilyIndex(VulkanDevice::GRAPHICS), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+	VK_CHECK(vkCreateCommandPool(device->logicalDevice, &commandPoolCreateInfo, nullptr, &commandPool));
+
+	VkCommandBufferAllocateInfo commandBufferAllocateInfo = vkinit::CommandBufferAllocateInfo(commandPool, 1);
+	VK_CHECK(vkAllocateCommandBuffers(device->logicalDevice, &commandBufferAllocateInfo, &mainCommandBuffer));
+
+	VkFenceCreateInfo fenceCreateInfo = vkinit::FenceCreateInfo(VK_FENCE_CREATE_SIGNALED_BIT);
+	VkSemaphoreCreateInfo semaphoreCreateInfo = vkinit::SemaphoreCreateInfo();
+
+	VK_CHECK(vkCreateFence(device->logicalDevice, &fenceCreateInfo, nullptr, &renderFence));
+	VK_CHECK(vkCreateSemaphore(device->logicalDevice, &semaphoreCreateInfo, nullptr, &swapchainSemaphore));
+	VK_CHECK(vkCreateSemaphore(device->logicalDevice, &semaphoreCreateInfo, nullptr, &renderSemaphore));
+}
+
+void FrameData::destroy(VulkanDevice* device) {
+	vkDestroySemaphore(device->logicalDevice, renderSemaphore, nullptr);
+	vkDestroySemaphore(device->logicalDevice, swapchainSemaphore, nullptr);
+	vkDestroyFence(device->logicalDevice, renderFence, nullptr);
+
+	vkDestroyCommandPool(device->logicalDevice, commandPool, nullptr);
+}
+
+
 
 
 void VulkanEngine::init() {
@@ -1010,6 +1035,8 @@ void VulkanEngine::init() {
 	
 	camera.pitch = 0;
 	camera.yaw = 0;
+
+	rendering = true;
 }
 
 void VulkanEngine::run() {
@@ -1037,6 +1064,7 @@ void VulkanEngine::run() {
 			//send SDL event to imgui for handling
 			ImGui_ImplSDL2_ProcessEvent(&e);
 		}
+		camera.update();
 	
 		//do not draw if we are minimized
 		if (!rendering) {
@@ -1071,14 +1099,24 @@ void VulkanEngine::draw() {
 }
 
 void VulkanEngine::destroy() {
+	vkDeviceWaitIdle(vulkanDevice.logicalDevice);
+
+	for (VulkanGLTFModel model : models) { model.destroy(&vulkanDevice); }
+	for (FrameData frame : framesData) { frame.destroy(&vulkanDevice); }
 
 	drawImage.destroy(&vulkanDevice);
 	depthImage.destroy(&vulkanDevice);
 	globalDescriptorAllocator.destroyPools(&vulkanDevice);
 
-	vkDestroyDescriptorSetLayout(_device, _gpuSceneDataDescriptorLayout, nullptr);
-	vkDestroyDescriptorSetLayout(_device, _singleImageDescriptorLayout, nullptr);
-	vkDestroyDescriptorSetLayout(_device, _drawImageDescriptorLayout, nullptr);
+	vkDestroyDescriptorSetLayout(vulkanDevice.logicalDevice, sceneDataDescriptorLayout, nullptr);
+	vkDestroyDescriptorSetLayout(vulkanDevice.logicalDevice, drawImageDescriptorLayout, nullptr);
+	vkDestroyDescriptorSetLayout(vulkanDevice.logicalDevice, materialWriter.materialDescriptorLayout, nullptr);
+	vkDestroyDescriptorPool(vulkanDevice.logicalDevice,imguiDescriptorPool, nullptr);
+
+	vulkanSwapchain.destroySwapchain(&vulkanDevice);
+	vulkanDevice.destroy();
+	vkb::destroy_debug_utils_messenger(instance, debugMessenger, nullptr);
+	vkDestroyInstance(instance, nullptr);
 }
 
 
@@ -1095,7 +1133,7 @@ void VulkanEngine::initVulkan() {
 		.value();
 
 	instance = vkbInstance.instance;
-	debug_messenger = vkbInstance.debug_messenger;
+	debugMessenger = vkbInstance.debug_messenger;
 
 	SDL_Vulkan_CreateSurface(window, instance, &surface);
 
@@ -1120,7 +1158,7 @@ void VulkanEngine::initVulkan() {
 }
 
 void VulkanEngine::initSwapchain() {
-	swapchain.createSwapchain(&vulkanDevice, surface, windowExtent.width, windowExtent.height);
+	vulkanSwapchain.createSwapchain(&vulkanDevice, surface, windowExtent.width, windowExtent.height);
 	VkExtent3D drawImageExtent = {
 		windowExtent.width,
 		windowExtent.height,
@@ -1187,7 +1225,7 @@ void VulkanEngine::initImgui() {
 
 	imguiInitInfo.PipelineRenderingCreateInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
 	imguiInitInfo.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
-	imguiInitInfo.PipelineRenderingCreateInfo.pColorAttachmentFormats = &swapchain.swapchainImageFormat;
+	imguiInitInfo.PipelineRenderingCreateInfo.pColorAttachmentFormats = &vulkanSwapchain.swapchainImageFormat;
 
 
 	imguiInitInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
@@ -1246,5 +1284,5 @@ void VulkanEngine::initDescriptors() {
 
 void VulkanEngine::initData() {
 	VulkanGLTFModel model;
-	model.init(&vulkanDevice, "", materialWriter);
+	model.init(&vulkanDevice, "../../assets/structure.glb", materialWriter);
 }

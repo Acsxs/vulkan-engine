@@ -4,7 +4,6 @@
 #include "vk_resources.h"
 #include "vk_descriptors.h"
 #include "vk_pipelines.h"
-#include "vk_device.h"
 
 
 
