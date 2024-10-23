@@ -1,7 +1,7 @@
 #include "vk_material.h"
 
 
-void SpecularMaterialWriter::buildPipelines(VulkanDevice* device, VkFormat drawFormat, VkFormat depthFormat, VkDescriptorSetLayout sceneDescriptorLayout){
+void MetallicRoughnessMaterialWriter::buildPipelines(VulkanDevice* device, VkFormat drawFormat, VkFormat depthFormat, VkDescriptorSetLayout sceneDescriptorLayout){
 	VkPushConstantRange matrixRange{};
 	matrixRange.offset = 0;
 	matrixRange.size = sizeof(GPUDrawPushConstants);
@@ -28,9 +28,9 @@ void SpecularMaterialWriter::buildPipelines(VulkanDevice* device, VkFormat drawF
 }
 
 
-SpecularMaterialReference SpecularMaterialWriter::writeMaterialInstance(VulkanDevice* device, MaterialPassType pass, const SpecularMaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator)
+MetallicMaterialInstance MetallicRoughnessMaterialWriter::writeMaterialInstance(VulkanDevice* device, MaterialPassType pass, const MetallicMaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator)
 {
-	SpecularMaterialReference matData;
+	MetallicMaterialInstance matData;
 	matData.pass = pass;
 	if (pass == MaterialPassType::Transparent) {
 		matData.pipeline = &pipelines.transparentPipeline;
@@ -44,9 +44,9 @@ SpecularMaterialReference SpecularMaterialWriter::writeMaterialInstance(VulkanDe
 
 
 	writer.clear();
-	writer.writeBuffer(0, resources.dataBuffer, sizeof(SpecularMaterialConstants), resources.dataBufferOffset, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-	writer.writeImage(1, resources.albedoImage.imageView, resources.albedoSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-	writer.writeImage(2, resources.specularGlossinessImage.imageView, resources.specularGlossinessSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+	writer.writeBuffer(0, resources.dataBuffer, sizeof(MetallicMaterialConstants), resources.dataBufferOffset, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+	writer.writeImage(1, resources.colorImage.imageView, resources.baseColourSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+	writer.writeImage(2, resources.metallicRoughnessImage.imageView, resources.metallicRoughnessSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
 	writer.updateSet(device->logicalDevice, matData.materialDescriptors);
 

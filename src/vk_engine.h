@@ -6,67 +6,12 @@
 #include "vk_device.h"
 #include "vk_types.h"
 #include "vk_descriptors.h"
-#include "vk_loader.h"
-#include "vk_destructor.h"
+#include "vk_gltf.h"
 #include "vk_swapchain.h"
 #include "camera.h"
 
 
 
-//
-//struct MeshNode : public Node {
-//
-//	std::shared_ptr<MeshAsset> mesh;
-//
-//	virtual void draw(const glm::mat4& topMatrix, DrawContext& ctx) override;
-//};
-//
-//struct RenderObject {
-//	uint32_t indexCount;
-//	uint32_t firstIndex;
-//	VkBuffer indexBuffer;
-//
-//	MaterialInstance* material;
-//
-//	glm::mat4 transform;
-//	VkDeviceAddress vertexBufferAddress;
-//};
-//
-//struct DrawContext {
-//	std::vector<RenderObject> OpaqueSurfaces;
-//};
-//
-//
-//struct RenderData {
-//	VkSemaphore _swapchainSemaphore, _renderSemaphore;
-//	VkFence _renderFence;
-//
-//	VkCommandPool _commandPool;
-//	VkCommandBuffer _mainCommandBuffer;
-//
-//	ResourceDestructor _frameDestructor;
-//	DescriptorAllocatorGrowable _frameDescriptors;
-//	void destroy(VulkanDevice* device);
-//	void init(VulkanDevice* device);
-//};
-//
-//constexpr unsigned int FRAMES_IN_FLIGHT = 2;
-//
-//struct ComputePushConstants {
-//	glm::vec4 data1;
-//	glm::vec4 data2;
-//	glm::vec4 data3;
-//	glm::vec4 data4;
-//};
-//
-//struct ComputeEffect {
-//	const char* name;
-//
-//	VkPipeline pipeline;
-//	VkPipelineLayout layout;
-//
-//	ComputePushConstants data;
-//};
 
 //class VulkanEngine {
 //public:
@@ -186,9 +131,7 @@ struct FrameData {
 	
 	VkCommandPool commandPool;
 	VkCommandBuffer mainCommandBuffer;
-	DescriptorAllocatorGrowable frameDescriptors;
-	
-	ResourceDestructor frameDestructor;
+
 	void destroy(VulkanDevice* device);
 	void init(VulkanDevice* device);
 };
@@ -218,24 +161,19 @@ public:
 	VkDescriptorPool imguiDescriptorPool;
 
 	DescriptorAllocatorGrowable globalDescriptorAllocator;
+	VkDescriptorSetLayout sceneDataDescriptorLayout;
 
 	VkDescriptorSet drawImageDescriptors;
 	VkDescriptorSetLayout drawImageDescriptorLayout;
 	AllocatedImage drawImage;
 	
 	AllocatedImage depthImage;
-	
-	VkDescriptorSetLayout singleImageDescriptorLayout;
-	
-	AllocatedImage whiteImage;
-	AllocatedImage blackImage;
-	AllocatedImage greyImage;
-	AllocatedImage errorCheckerboardImage;
-	
-	VkSampler defaultSamplerLinear;
-	VkSampler defaultSamplerNearest;
 
 	VulkanPipeline defaultPipeline;
+
+	MetallicRoughnessMaterialWriter materialWriter;
+
+	std::vector<VulkanGLTFModel> models;
 
 	void init();
 	void run();
@@ -247,6 +185,6 @@ private:
 	void initImgui();
 	void initPipelines();
 	void initDescriptors();
-	void initDummyData();
+	void initData();
 
 };

@@ -18,28 +18,28 @@ enum class MaterialPassType: uint8_t {
 };
 
 
-struct MaterialReference {
+struct MaterialInstance {
 	VulkanPipeline* pipeline;
 	VkDescriptorSet materialDescriptors;
 	MaterialPassType pass;
 };
 
-struct SpecularMaterialResources {
-	AllocatedImage albedoImage;
-	VkSampler albedoSampler;
-	AllocatedImage specularGlossinessImage;
-	VkSampler specularGlossinessSampler;
+struct MetallicMaterialResources {
+	AllocatedImage baseColourImage;
+	VkSampler baseColourSampler;
+	AllocatedImage metallicRoughnessImage;
+	VkSampler metallicRoughnessSampler;
 	VkBuffer dataBuffer;
 	uint32_t dataBufferOffset;
 };
-struct SpecularMaterialConstants {
-	glm::vec4 albedoFactors;
-	glm::vec4 specularGlossinessFactors;
+struct MetallicMaterialConstants {
+	glm::vec4 baseColorFactors;
+	glm::vec4 metallicRoughnessFactors;
 	//padding for uniform buffers
 	glm::vec4 extra[14];
 };
 
-struct SpecularMaterialWriter {
+struct MetallicRoughnessMaterialWriter {
 	VkDescriptorSetLayout materialDescriptorLayout;
 	DescriptorWriter writer;
 	MaterialPipelines pipelines; 
@@ -47,9 +47,9 @@ struct SpecularMaterialWriter {
 	void buildPipelines(VulkanDevice* device, VkFormat drawFormat, VkFormat depthFormat, VkDescriptorSetLayout sceneDescriptorLayout);
 	void destroyPipelines(VulkanDevice* device) { pipelines.destroy(device); };
 	
-	SpecularMaterialReference writeMaterialInstance(VulkanDevice* device, MaterialPassType pass, const SpecularMaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
+	MetallicMaterialInstance writeMaterialInstance(VulkanDevice* device, MaterialPassType pass, const MetallicMaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
 };
 
 
-struct SpecularMaterialReference : MaterialReference {};
+struct MetallicMaterialInstance : MaterialInstance {};
 

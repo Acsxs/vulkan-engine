@@ -6,7 +6,7 @@
 #include <unordered_map>
 
 
-struct SceneBuffers {
+struct MeshBuffers {
     AllocatedBuffer indexBuffer;
     AllocatedBuffer vertexBuffer;
     VkDeviceAddress vertexBufferAddress;
@@ -16,7 +16,7 @@ struct SceneBuffers {
 
 struct Texture {
     AllocatedImage* image;
-    VkSampler* sampler;
+    VkSampler sampler;
 };
 
 
@@ -28,29 +28,37 @@ public:
     VulkanDevice* vulkanDevice;
     VkQueue copyQueue;
 
-    SceneBuffers SceneBuffers;
+    MeshBuffers meshBuffers;
     int indexCount;
-    std::vector<SpecularMaterialReference> materialReference;
-    std::vector<AllocatedImage> images;
-    std::vector<std::shared_ptr<Node>> topNodes;
 
-    std::vector<VkSampler> samplers;
+    std::vector<MetallicMaterialInstance> materialReferences;
+
+    std::vector<AllocatedImage> images;
+    std::vector<VkSamplerCreateInfo> samplerInfos;
+    std::vector<Texture> textures;
+
+
+    std::vector<std::shared_ptr<Node>> topNodes;
 
     DescriptorAllocatorGrowable descriptorPool;
 
     AllocatedBuffer materialDataBuffer;
+
+    AllocatedImage defaultImage;
+    VkSampler defaultSampler;
     
 
 
-    void init(VulkanDevice* device);
+    void init(VulkanDevice* device, std::string filename, MetallicRoughnessMaterialWriter writer);
     void destroy(VulkanDevice* device);
-    void addNodeDraws();
+    void addNodeDraws(glm::mat4& topMatrix, DrawObjectCollection& col);
 
 private:
     void loadImages(VulkanDevice* device, tinygltf::Model& input);
+    void loadSamplers(VulkanDevice* device, tinygltf::Model& input);
     void loadTextures(VulkanDevice* device, tinygltf::Model& input);
-    void loadMaterials(VulkanDevice* device, tinygltf::Model& input);
-    void loadNode(VulkanDevice* device, const tinygltf::Node& inputNode, const tinygltf::Model& input, std::shared_ptr<Node> parent, std::vector<uint32_t>& indices, std::vector<Vertex>& vertices);
+    void loadMaterials(VulkanDevice* device, tinygltf::Model& input, MetallicRoughnessMaterialWriter writer);
+    void loadNode(const tinygltf::Node& inputNode, const tinygltf::Model& input, std::shared_ptr<Node> parent, std::vector<uint32_t>& indices, std::vector<Vertex>& vertices);
 };
 
 // Contains data for a single draw call
@@ -69,7 +77,7 @@ struct Mesh {
 struct GeometrySurface {
     uint32_t startIndex;
     uint32_t count;
-    std::shared_ptr<MaterialReference> material;
+    std::shared_ptr<MaterialInstance> material;
 };
 
 struct SceneData {
@@ -84,7 +92,7 @@ struct SceneData {
 };
 
 // A node represents an object in the glTF scene graph
-struct Node: public IRenderable {
+struct Node {
     std::weak_ptr<Node> parent;
     std::vector<std::shared_ptr<Node>> children;
 
@@ -99,18 +107,16 @@ struct Node: public IRenderable {
         }
     }
 
-    virtual void appendDraw(const glm::mat4& topMatrix, DrawObjectCollection& ctx)
+    virtual void appendDraw(VulkanGLTFModel* model, const glm::mat4& topMatrix, DrawObjectCollection& collection)
     {
         // draw children
         for (auto& c : children) {
-            c->appendDraw(topMatrix, ctx);
+            c->appendDraw(model, topMatrix, collection);
         }
     }
 };
 
 struct MeshNode : public Node {
-    std::shared_ptr<MeshAsset> mesh;
-
-    virtual void draw(const glm::mat4& topMatrix, DrawContext& ctx) override;
-
+    Mesh mesh;
+    virtual void appendDraw(VulkanGLTFModel* model, const glm::mat4& topMatrix, DrawObjectCollection& collection) override;
 };
