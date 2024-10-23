@@ -4,6 +4,7 @@
 #include "vk_types.h"
 #include "vk_initializers.h"
 
+#include "vk_mem_alloc.h"
 
 
 class VulkanDevice {

@@ -1,5 +1,4 @@
 #include "vk_device.h"
-#include <iostream>
 
 void VulkanDevice::init(vkb::PhysicalDevice vkbPhysicalDevice, VkInstance instance) {
 

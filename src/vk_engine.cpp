@@ -5,7 +5,6 @@
 #include "vk_resources.h"
 #include "vk_pipelines.h"
 
-#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/transform.hpp>
 
 #include <SDL.h>
@@ -17,8 +16,6 @@
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_vulkan.h"
 
-#define VMA_IMPLEMENTATION
-#include "vk_mem_alloc.h"
 
 #include <chrono>
 #include <thread>

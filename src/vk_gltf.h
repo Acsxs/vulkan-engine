@@ -11,7 +11,6 @@
 #define TINYGLTF_IMPLEMENTATION
 #include "tiny_gltf.h"
 
-
 struct MeshBuffers {
     AllocatedBuffer indexBuffer;
     AllocatedBuffer vertexBuffer;
@@ -25,6 +24,73 @@ struct Texture {
     VkSampler sampler;
 };
 
+// Contains data for a single draw call
+struct Primitive {
+    uint32_t firstIndex;
+    uint32_t indexCount;
+    int32_t materialIndex;
+};
+
+struct Mesh {
+    std::vector<Primitive> primitives;
+};
+
+
+
+struct GeometrySurface {
+    uint32_t startIndex;
+    uint32_t count;
+    std::shared_ptr<MaterialInstance> material;
+};
+
+struct SceneData {
+    glm::mat4 view;
+    glm::mat4 projection;
+    glm::mat4 viewProjection;
+
+    glm::vec4 viewPos;
+    glm::vec4 ambientColor;
+    glm::vec4 sunlightDirection; // w for sun power
+    glm::vec4 sunlightColor;
+};
+
+//forward declaration for Node
+class VulkanGLTFModel;
+
+// Extendable class for recursive draw
+struct IRenderable {
+    virtual void appendDraw(VulkanGLTFModel* model, const glm::mat4& topMatrix, DrawObjectCollection& collection) {};
+};
+
+// A node represents an object in the glTF scene graph
+struct Node: IRenderable {
+    std::weak_ptr<Node> parent;
+    std::vector<std::shared_ptr<Node>> children;
+
+    glm::mat4 localTransform;
+    glm::mat4 worldTransform;
+
+    void refreshTransform(const glm::mat4& parentMatrix)
+    {
+        worldTransform = parentMatrix * localTransform;
+        for (auto c : children) {
+            c->refreshTransform(worldTransform);
+        }
+    }
+
+    virtual void appendDraw(VulkanGLTFModel* model, const glm::mat4& topMatrix, DrawObjectCollection& collection)
+    {
+        // draw children
+        for (auto& c : children) {
+            c->appendDraw(model, topMatrix, collection);
+        }
+    }
+};
+
+struct MeshNode : public Node {
+    Mesh mesh;
+    virtual void appendDraw(VulkanGLTFModel* model, const glm::mat4& topMatrix, DrawObjectCollection& collection) override;
+};
 
 // Contains everything required to render a glTF model in Vulkan
 // This class is heavily simplified (compared to glTF's feature set) but retains the basic glTF structure
@@ -65,64 +131,4 @@ private:
     void loadTextures(VulkanDevice* device, tinygltf::Model& input);
     void loadMaterials(VulkanDevice* device, tinygltf::Model& input, MetallicRoughnessMaterialWriter writer);
     void loadNode(const tinygltf::Node& inputNode, const tinygltf::Model& input, std::shared_ptr<Node> parent, std::vector<uint32_t>& indices, std::vector<Vertex>& vertices);
-};
-
-// Contains data for a single draw call
-struct Primitive {
-    uint32_t firstIndex;
-    uint32_t indexCount;
-    int32_t materialIndex;
-};
-
-struct Mesh {
-    std::vector<Primitive> primitives;
-};
-
-
-
-struct GeometrySurface {
-    uint32_t startIndex;
-    uint32_t count;
-    std::shared_ptr<MaterialInstance> material;
-};
-
-struct SceneData {
-    glm::mat4 view;
-    glm::mat4 projection;
-    glm::mat4 viewProjection;
-
-    glm::vec4 viewPos;
-    glm::vec4 ambientColor;
-    glm::vec4 sunlightDirection; // w for sun power
-    glm::vec4 sunlightColor;
-};
-
-// A node represents an object in the glTF scene graph
-struct Node {
-    std::weak_ptr<Node> parent;
-    std::vector<std::shared_ptr<Node>> children;
-
-    glm::mat4 localTransform;
-    glm::mat4 worldTransform;
-
-    void refreshTransform(const glm::mat4& parentMatrix)
-    {
-        worldTransform = parentMatrix * localTransform;
-        for (auto c : children) {
-            c->refreshTransform(worldTransform);
-        }
-    }
-
-    virtual void appendDraw(VulkanGLTFModel* model, const glm::mat4& topMatrix, DrawObjectCollection& collection)
-    {
-        // draw children
-        for (auto& c : children) {
-            c->appendDraw(model, topMatrix, collection);
-        }
-    }
-};
-
-struct MeshNode : public Node {
-    Mesh mesh;
-    virtual void appendDraw(VulkanGLTFModel* model, const glm::mat4& topMatrix, DrawObjectCollection& collection) override;
 };

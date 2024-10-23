@@ -31,12 +31,15 @@ struct MetallicMaterialResources {
 	VkBuffer dataBuffer;
 	uint32_t dataBufferOffset;
 };
+
 struct MetallicMaterialConstants {
 	glm::vec4 baseColorFactors;
 	glm::vec4 metallicRoughnessFactors;
 	//padding for uniform buffers
 	glm::vec4 extra[14];
 };
+
+struct MetallicMaterialInstance : MaterialInstance {};
 
 struct MetallicRoughnessMaterialWriter {
 	VkDescriptorSetLayout materialDescriptorLayout;
@@ -48,7 +51,4 @@ struct MetallicRoughnessMaterialWriter {
 	
 	MetallicMaterialInstance writeMaterialInstance(VulkanDevice* device, MaterialPassType pass, const MetallicMaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator);
 };
-
-
-struct MetallicMaterialInstance : MaterialInstance {};
 
