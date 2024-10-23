@@ -59,7 +59,7 @@ void VulkanGLTFModel::init(VulkanDevice* device, std::string filename, MetallicR
 		{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1 }
 	};
 
-	descriptorPool.init(device->logicalDevice, materialReferences.size(), sizes);
+	descriptorPool.init(device, materialReferences.size(), sizes);
 
 	std::vector<uint32_t> indices;
 	std::vector<Vertex> vertices;
@@ -85,13 +85,14 @@ void VulkanGLTFModel::init(VulkanDevice* device, std::string filename, MetallicR
 	const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
 	const size_t indexBufferSize = indices.size() * sizeof(uint32_t);
 
-	meshBuffers.indexBuffer = device->createBuffer(vertexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
-	meshBuffers.vertexBuffer = device->createBuffer(indexBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+	meshBuffers.indexBuffer.init(device, vertexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+	meshBuffers.vertexBuffer.init(device, indexBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 
 	VkBufferDeviceAddressInfo deviceAdressInfo{ .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,.buffer = meshBuffers.vertexBuffer.buffer };
 	meshBuffers.vertexBufferAddress = vkGetBufferDeviceAddress(device->logicalDevice, &deviceAdressInfo);
 
-	AllocatedBuffer staging = device->createBuffer(vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
+	AllocatedBuffer staging = {};
+	staging.init(device, vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY);
 
 	void* data = staging.allocation->GetMappedData();
 
@@ -118,7 +119,7 @@ void VulkanGLTFModel::init(VulkanDevice* device, std::string filename, MetallicR
 		VulkanDevice::TRANSFER
 	);
 
-	device->destroyBuffer(staging);
+	staging.destroy(device);
 }
 
 void VulkanGLTFModel::loadImages(VulkanDevice* device, tinygltf::Model& input)
@@ -153,7 +154,7 @@ void VulkanGLTFModel::loadImages(VulkanDevice* device, tinygltf::Model& input)
 		}
 		// Load texture from image buffer
 		
-		images[i] = (device->createImage(bufferData, VkExtent3D{ (uint16_t)glTFImage.width,(uint16_t)glTFImage.height, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false));
+		images[i].init(device, bufferData, VkExtent3D{ (uint16_t)glTFImage.width,(uint16_t)glTFImage.height, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, false);
 		if (deleteBuffer) {
 			delete[] bufferData;
 		}
@@ -232,14 +233,14 @@ void VulkanGLTFModel::loadMaterials(VulkanDevice* device, tinygltf::Model& input
 			pixels[y * 16 + x] = ((x % 2) ^ (y % 2)) ? magenta : black;
 		}
 	}
-	defaultImage = device->createImage(pixels.data(), VkExtent3D{ 16, 16, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
+	defaultImage.init(device, pixels.data(), VkExtent3D{ 16, 16, 1 }, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 	VkSamplerCreateInfo defaultSamplerInfo = { .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
 	defaultSamplerInfo.magFilter = VK_FILTER_NEAREST;
 	defaultSamplerInfo.minFilter = VK_FILTER_NEAREST;
 	vkCreateSampler(device->logicalDevice, &defaultSamplerInfo, nullptr, &defaultSampler);
 
 	materialReferences.resize(input.materials.size());
-	materialDataBuffer = device->createBuffer(sizeof(MetallicMaterialConstants) * input.materials.size(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+	materialDataBuffer.init(device, sizeof(MetallicMaterialConstants) * input.materials.size(), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 	int data_index = 0;
 
 	MetallicMaterialConstants* sceneMaterialConstants = (MetallicMaterialConstants*)materialDataBuffer.info.pMappedData;
@@ -436,14 +437,14 @@ void VulkanGLTFModel::addNodeDraws(glm::mat4& topMatrix, DrawObjectCollection& c
 void VulkanGLTFModel::destroy(VulkanDevice* device) {
 	meshBuffers.destroy(device);
 	for (AllocatedImage image : images) {
-		device->destroyImage(image);
+		image.destroy(device);
 	}
 	for (Texture texture : textures) {
 		vkDestroySampler(device->logicalDevice, texture.sampler, nullptr);
 	}
-	device->destroyImage(defaultImage);
+	defaultImage.destroy(device);
 	vkDestroySampler(device->logicalDevice, defaultSampler, nullptr);
-	device->destroyBuffer(materialDataBuffer);
+	materialDataBuffer.destroy(device);
 	descriptorPool.destroyPools(device->logicalDevice);
 }
 

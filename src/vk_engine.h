@@ -150,7 +150,6 @@ public:
 	VkInstance instance;
 	VkDebugUtilsMessengerEXT debug_messenger;
 	VulkanDevice vulkanDevice;
-	ResourceDestructor mainDestructor;
 	VulkanSwapchain swapchain;
 	VkSurfaceKHR surface;
 

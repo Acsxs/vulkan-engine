@@ -25,7 +25,6 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
 
-#include "vk_resources.h"
 #include "vk_material.h"
 #include <iostream>
 
@@ -54,6 +53,10 @@ struct SceneData {
     glm::vec4 sunlightColor;
 };
 
+struct DrawPushConstants {
+    glm::mat4 worldMatrix;
+    VkDeviceAddress vertexBuffer;
+};
 
 struct DrawObjectInfo {
     uint32_t indexCount;

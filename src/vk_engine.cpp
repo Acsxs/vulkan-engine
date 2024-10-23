@@ -1072,7 +1072,9 @@ void VulkanEngine::draw() {
 
 void VulkanEngine::destroy() {
 
-	globalDescriptorAllocator.destroyPools(_device);
+	drawImage.destroy(&vulkanDevice);
+	depthImage.destroy(&vulkanDevice);
+	globalDescriptorAllocator.destroyPools(&vulkanDevice);
 
 	vkDestroyDescriptorSetLayout(_device, _gpuSceneDataDescriptorLayout, nullptr);
 	vkDestroyDescriptorSetLayout(_device, _singleImageDescriptorLayout, nullptr);
@@ -1136,14 +1138,12 @@ void VulkanEngine::initSwapchain() {
 	VmaAllocationCreateInfo renderImageAllocationCreateInfo = {};
 	renderImageAllocationCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 	renderImageAllocationCreateInfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-	drawImage = vulkanDevice.createImage(drawImageExtent, VK_FORMAT_R16G16B16A16_SFLOAT, drawImageUsages, VK_IMAGE_ASPECT_COLOR_BIT);
+	drawImage.init(&vulkanDevice, drawImageExtent, VK_FORMAT_R16G16B16A16_SFLOAT, drawImageUsages, VK_IMAGE_ASPECT_COLOR_BIT);
 		
 	VkImageUsageFlags depthImageUsages{};
 	depthImageUsages |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 		
-	depthImage = vulkanDevice.createImage(drawImageExtent, VK_FORMAT_D32_SFLOAT, depthImageUsages, VK_IMAGE_ASPECT_DEPTH_BIT);
-	mainDestructor.images.push_back(&drawImage);
-	mainDestructor.images.push_back(&depthImage);
+	depthImage.init(&vulkanDevice, drawImageExtent, VK_FORMAT_D32_SFLOAT, depthImageUsages, VK_IMAGE_ASPECT_DEPTH_BIT);
 	
 
 }
@@ -1219,7 +1219,7 @@ void VulkanEngine::initDescriptors() {
 		{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 }
 	};
 
-	globalDescriptorAllocator.init(vulkanDevice.logicalDevice, 10, sizes);
+	globalDescriptorAllocator.init(&vulkanDevice, 10, sizes);
 
 	{
 		DescriptorLayoutBuilder builder;
@@ -1234,25 +1234,13 @@ void VulkanEngine::initDescriptors() {
 		drawImageDescriptorLayout = builder.build(vulkanDevice.logicalDevice, VK_SHADER_STAGE_COMPUTE_BIT);
 	}
 
-	drawImageDescriptors = globalDescriptorAllocator.allocate(vulkanDevice.logicalDevice, drawImageDescriptorLayout);
+	drawImageDescriptors = globalDescriptorAllocator.allocate(&vulkanDevice, drawImageDescriptorLayout);
 
 	{
 		DescriptorWriter writer;
 		writer.writeImage(0, drawImage.imageView, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
 
 		writer.updateSet(vulkanDevice.logicalDevice, drawImageDescriptors);
-	}
-
-	for (int i = 0; i < FRAMES_IN_FLIGHT; i++) {
-		// create a descriptor pool
-		std::vector<DescriptorAllocatorGrowable::PoolSizeRatio> frame_sizes = {
-			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 3 },
-			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 3 },
-			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 3 },
-			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4 },
-		};
-		framesData[i].frameDescriptors = DescriptorAllocatorGrowable{};
-		framesData[i].frameDescriptors.init(vulkanDevice.logicalDevice, 1000, frame_sizes);
 	}
 }
 

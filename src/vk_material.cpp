@@ -4,7 +4,7 @@
 void MetallicRoughnessMaterialWriter::buildPipelines(VulkanDevice* device, VkFormat drawFormat, VkFormat depthFormat, VkDescriptorSetLayout sceneDescriptorLayout){
 	VkPushConstantRange matrixRange{};
 	matrixRange.offset = 0;
-	matrixRange.size = sizeof(GPUDrawPushConstants);
+	matrixRange.size = sizeof(DrawPushConstants);
 	matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
 	DescriptorLayoutBuilder layoutBuilder;
@@ -40,12 +40,12 @@ MetallicMaterialInstance MetallicRoughnessMaterialWriter::writeMaterialInstance(
 	}
 	
 
-	matData.materialDescriptors = descriptorAllocator.allocate(device->logicalDevice, materialDescriptorLayout);
+	matData.materialDescriptors = descriptorAllocator.allocate(device, materialDescriptorLayout);
 
 
 	writer.clear();
 	writer.writeBuffer(0, resources.dataBuffer, sizeof(MetallicMaterialConstants), resources.dataBufferOffset, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-	writer.writeImage(1, resources.colorImage.imageView, resources.baseColourSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+	writer.writeImage(1, resources.baseColourImage.imageView, resources.baseColourSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 	writer.writeImage(2, resources.metallicRoughnessImage.imageView, resources.metallicRoughnessSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
 	writer.updateSet(device->logicalDevice, matData.materialDescriptors);

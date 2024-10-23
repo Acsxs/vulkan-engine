@@ -5,8 +5,6 @@ add_executable (engine
   vk_types.h
   vk_descriptors.h
   vk_descriptors.cpp
-  vk_destructor.h
-  vk_destructor.cpp
   vk_device.h
   vk_device.cpp
   vk_engine.h
@@ -15,8 +13,6 @@ add_executable (engine
   vk_gltf.cpp
   vk_initializers.cpp
   vk_initializers.h
-  vk_loader.h
-  vk_loader.cpp
   vk_material.h
   vk_material.cpp
   vk_pipelines.h

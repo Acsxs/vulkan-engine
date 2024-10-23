@@ -11,7 +11,7 @@ struct MeshBuffers {
     AllocatedBuffer vertexBuffer;
     VkDeviceAddress vertexBufferAddress;
 
-    void destroy(VulkanDevice* device) { device->destroyBuffer(indexBuffer); device->destroyBuffer(vertexBuffer); };
+    void destroy(VulkanDevice* device) { indexBuffer.destroy(device); vertexBuffer.destroy(device); };
 };
 
 struct Texture {

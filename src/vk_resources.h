@@ -28,6 +28,10 @@ struct VulkanImage {
 
 struct AllocatedImage : VulkanImage {
     VmaAllocation allocation;
+
+    void init(VulkanDevice* device, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags aspectFlags, bool mipmapped = false);
+    void init(VulkanDevice* device, void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags aspectFlags, bool mipmapped = false);
+    void destroy(VulkanDevice* device);
 };
 
 
@@ -37,7 +41,7 @@ struct VulkanBuffer {
 
     void copyToBuffer(
         VkCommandBuffer* commandBuffer,
-        VulkanBuffer dstBufffer,
+        VulkanBuffer* dstBufffer,
         size_t size,
         uint32_t srcOffset = 0,
         uint32_t dstOffset = 0
@@ -45,7 +49,7 @@ struct VulkanBuffer {
 
     void copyToImage(
         VkCommandBuffer* commandBuffer,
-        VulkanImage image,
+        VulkanImage* image,
         uint32_t srcOffset,
         uint32_t bufferRowLength,
         uint32_t imageHeight,
@@ -57,6 +61,9 @@ struct VulkanBuffer {
 struct AllocatedBuffer : VulkanBuffer {
     VmaAllocation allocation;
     VmaAllocationInfo info;
+
+    void init(VulkanDevice* device, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage);
+    void destroy(VulkanDevice* device);
 
     void uploadData(void* data, size_t dataSize) { memcpy(info.pMappedData, data, dataSize); };
 };

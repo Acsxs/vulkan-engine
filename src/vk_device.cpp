@@ -1,4 +1,3 @@
-
 #include "vk_device.h"
 #include <iostream>
 
@@ -61,89 +60,6 @@ void VulkanDevice::destroy() {
 	vmaDestroyAllocator(allocator);
 	vkDestroyDevice(logicalDevice, nullptr);
 }
-
-AllocatedBuffer VulkanDevice::createBuffer(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memoryUsage) {
-
-	// allocate buffer
-	VkBufferCreateInfo bufferCreateInfo = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-	bufferCreateInfo.pNext = nullptr;
-	bufferCreateInfo.size = allocSize;
-
-	bufferCreateInfo.usage = usage;
-
-	VmaAllocationCreateInfo bufferAllocationCreateInfo = {};
-	bufferAllocationCreateInfo.usage = memoryUsage;
-	bufferAllocationCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-	AllocatedBuffer newBuffer = {};
-
-	// allocate the buffer
-	VK_CHECK(vmaCreateBuffer(allocator, &bufferCreateInfo, &bufferAllocationCreateInfo, &newBuffer.buffer, &newBuffer.allocation, &newBuffer.info));
-
-	return newBuffer;
-}
-
-void VulkanDevice::destroyBuffer(const AllocatedBuffer& buffer) {
-	vmaDestroyBuffer(allocator, buffer.buffer, buffer.allocation);
-}
-
-
-AllocatedImage VulkanDevice::createImage(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool mipmapped)
-{
-	AllocatedImage newImage;
-	newImage.imageFormat = format;
-	newImage.imageExtent = size;
-	newImage.imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-	VkImageCreateInfo img_info = vkinit::ImageCreateInfo(format, usage, size);
-	if (mipmapped) {
-		img_info.mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(size.width, size.height)))) + 1;
-	}
-
-	// always allocate images on dedicated GPU memory
-	VmaAllocationCreateInfo allocinfo = {};
-	allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-	allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-	// allocate and create the image
-	VK_CHECK(vmaCreateImage(allocator, &img_info, &allocinfo, &newImage.image, &newImage.allocation, nullptr));
-
-	// if the format is a depth format, we will need to have it use the correct
-	// aspect flag
-	//VkImageAspectFlags aspectFlag = VK_IMAGE_ASPECT_COLOR_BIT;
-	//if (format == VK_FORMAT_D32_SFLOAT) {
-	//	aspectFlag = VK_IMAGE_ASPECT_DEPTH_BIT;
-	//}
-
-	// build a image-view for the image
-	VkImageViewCreateInfo view_info = vkinit::ImageViewCreateInfo(format, newImage.image, aspect);
-	view_info.subresourceRange.levelCount = img_info.mipLevels;
-
-	VK_CHECK(vkCreateImageView(logicalDevice, &view_info, nullptr, &newImage.imageView));
-
-	return newImage;
-}
-
-AllocatedImage VulkanDevice::createImage(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, VkImageAspectFlags aspect, bool mipmapped)
-{
-	size_t dataSize = size.depth * size.width * size.height * 4;
-	AllocatedBuffer uploadBuffer = createBuffer(dataSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-	uploadBuffer.uploadData(data, dataSize);
-
-	AllocatedImage newImage = createImage(size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, aspect, mipmapped);
-
-	immediateSubmit([&](VkCommandBuffer* commandBuffer) { uploadBuffer.copyToImage(commandBuffer, newImage, 0, 0, 0, aspect, size); }, GRAPHICS);
-
-	destroyBuffer(uploadBuffer);
-
-	return newImage;
-}
-
-void VulkanDevice::destroyImage(const AllocatedImage& img)
-{
-	vkDestroyImageView(logicalDevice, img.imageView, nullptr);
-	vmaDestroyImage(allocator, img.image, img.allocation);
-}
-
 
 
 void VulkanDevice::immediateSubmit(std::function<void(VkCommandBuffer* commandBuffer)>&& function, queueType queueType)
