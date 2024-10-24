@@ -25,20 +25,13 @@ struct Texture {
 struct Primitive {
     uint32_t firstIndex;
     uint32_t indexCount;
-    int32_t materialIndex;
+    std::shared_ptr<MaterialInstance> materialInstance;
 };
 
 struct Mesh {
     std::vector<Primitive> primitives;
 };
 
-
-
-struct GeometrySurface {
-    uint32_t startIndex;
-    uint32_t count;
-    std::shared_ptr<MaterialInstance> material;
-};
 
 struct SceneData {
     glm::mat4 view;
@@ -56,7 +49,7 @@ class VulkanGLTFModel;
 
 // Extendable class for recursive draw
 struct IRenderable {
-    virtual void appendDraw(VulkanGLTFModel* model, const glm::mat4& topMatrix, DrawObjectCollection& collection) {};
+    virtual void appendDraw( const glm::mat4& topMatrix, DrawObjectCollection* collection) {};
 };
 
 // A node represents an object in the glTF scene graph
@@ -75,18 +68,19 @@ struct Node: IRenderable {
         }
     }
 
-    virtual void appendDraw(VulkanGLTFModel* model, const glm::mat4& topMatrix, DrawObjectCollection& collection)
+    virtual void appendDraw( const glm::mat4& topMatrix, DrawObjectCollection* collection)
     {
         // draw children
         for (auto& c : children) {
-            c->appendDraw(model, topMatrix, collection);
+            c->appendDraw(topMatrix, collection);
         }
     }
 };
 
 struct MeshNode : public Node {
     Mesh mesh;
-    virtual void appendDraw(VulkanGLTFModel* model, const glm::mat4& topMatrix, DrawObjectCollection& collection) override;
+    MeshBuffers* meshBuffers;
+    virtual void appendDraw(const glm::mat4& topMatrix, DrawObjectCollection* collection) override;
 };
 
 // Contains everything required to render a glTF model in Vulkan
@@ -96,8 +90,8 @@ public:
     MeshBuffers meshBuffers = {};
     int indexCount = 0;
 
-    std::vector<MetallicMaterialInstance> materialInstances;
-    MetallicMaterialInstance defaultMaterialInstance;
+    std::vector<std::shared_ptr<MaterialInstance>> materialInstances;
+    std::shared_ptr<MaterialInstance> defaultMaterialInstance;
 
     std::vector<AllocatedImage> images;
     std::vector<VkSamplerCreateInfo> samplerInfos;
@@ -115,14 +109,14 @@ public:
     
 
 
-    void init(VulkanDevice* device, std::string filename, MetallicRoughnessMaterialWriter writer);
+    void init(VulkanDevice* device, std::string filename, MetallicRoughnessMaterialWriter* writer);
     void destroy(VulkanDevice* device);
-    void addNodeDraws(glm::mat4& topMatrix, DrawObjectCollection& col);
+    void addNodeDraws(glm::mat4& topMatrix, DrawObjectCollection* col);
 
 private:
     void loadImages(VulkanDevice* device, tinygltf::Model& input);
     void loadSamplers(VulkanDevice* device, tinygltf::Model& input);
     void loadTextures(VulkanDevice* device, tinygltf::Model& input);
-    void loadMaterials(VulkanDevice* device, tinygltf::Model& input, MetallicRoughnessMaterialWriter writer);
+    void loadMaterials(VulkanDevice* device, tinygltf::Model& input, MetallicRoughnessMaterialWriter* writer);
     void loadNode(const tinygltf::Node& inputNode, const tinygltf::Model& input, std::shared_ptr<Node> parent, std::vector<uint32_t>& indices, std::vector<Vertex>& vertices);
 };

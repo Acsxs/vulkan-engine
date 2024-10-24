@@ -78,8 +78,7 @@ VkPipeline vkutil::buildPipeline(VulkanDevice* device, VkPipelineLayout layout, 
         colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
         colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
         colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
-    }
-    else if (info.blending == PipelineInfo::ALPHA) {
+    }  else if (info.blending == PipelineInfo::ALPHA) {
         // destination is (current colour*(1-new color alpha)) + (new colour* new color alpha)
         colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
         colorBlendAttachment.blendEnable = VK_TRUE;
@@ -101,15 +100,27 @@ VkPipeline vkutil::buildPipeline(VulkanDevice* device, VkPipelineLayout layout, 
     multisampling.alphaToOneEnable = VK_FALSE;
 
     VkPipelineDepthStencilStateCreateInfo depthStencil = { .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
-    depthStencil.depthTestEnable = VK_TRUE;
-    depthStencil.depthWriteEnable = info.depthWriteEnable;
-    depthStencil.depthCompareOp = info.depthCompareOperation;
-    depthStencil.depthBoundsTestEnable = VK_FALSE;
-    depthStencil.stencilTestEnable = VK_FALSE;
-    depthStencil.front = {};
-    depthStencil.back = {};
-    depthStencil.minDepthBounds = 0.f;
-    depthStencil.maxDepthBounds = 1.f;
+    if (info.doDepthTest) {
+        depthStencil.depthTestEnable = VK_TRUE;
+        depthStencil.depthWriteEnable = info.depthWriteEnable;
+        depthStencil.depthCompareOp = info.depthCompareOperation;
+        depthStencil.depthBoundsTestEnable = VK_FALSE;
+        depthStencil.stencilTestEnable = VK_FALSE;
+        depthStencil.front = {};
+        depthStencil.back = {};
+        depthStencil.minDepthBounds = 0.f;
+        depthStencil.maxDepthBounds = 1.f;
+    }  else {
+        depthStencil.depthTestEnable = VK_FALSE;
+        depthStencil.depthWriteEnable = VK_FALSE;
+        depthStencil.depthCompareOp = VK_COMPARE_OP_NEVER;
+        depthStencil.depthBoundsTestEnable = VK_FALSE;
+        depthStencil.stencilTestEnable = VK_FALSE;
+        depthStencil.front = {};
+        depthStencil.back = {};
+        depthStencil.minDepthBounds = 0.f;
+        depthStencil.maxDepthBounds = 1.f;
+    }
 
     VkPipelineRenderingCreateInfo renderInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
     renderInfo.colorAttachmentCount = 1;
@@ -207,7 +218,7 @@ void MaterialPipelines::init(VulkanDevice* device, VkFormat drawFormat, VkFormat
     pipelineInfo.pipelineLayoutInfo = layout;
 
     opaquePipeline.init(device, pipelineInfo);
-
+   
     pipelineInfo.blending = PipelineInfo::ALPHA;
     transparentPipeline.init(device, pipelineInfo);
 

@@ -164,11 +164,12 @@ void VulkanEngine::run() {
 
 void VulkanEngine::draw() {
 
-	appendSceneDraws();
 	VkClearColorValue clearColour = { .float32 = {0.0, 0.0, 0.0} };
 	FrameData* currentFrame = &getCurrentFrameData();
 	VK_CHECK(vkWaitForFences(vulkanDevice.logicalDevice, 1, &currentFrame->renderFence, true, 1000000000));
 	currentFrame->frameDescriptors.clearPools(&vulkanDevice);
+
+	appendSceneDraws();
 
 	camera.update();
 
@@ -263,8 +264,8 @@ void VulkanEngine::appendSceneDraws() {
 	drawObjectCollection.transparentObjects.clear();
 
 	glm::mat4 topMatrix = glm::mat4{ 1.f };
-	for (VulkanGLTFModel model : models) {
-		model.addNodeDraws(topMatrix, drawObjectCollection);
+	for (std::shared_ptr<VulkanGLTFModel> model : models) {
+		model->addNodeDraws(topMatrix, &drawObjectCollection);
 	}	
 }
 
@@ -300,31 +301,33 @@ void VulkanEngine::drawGeometry(VkCommandBuffer* commandBuffer, FrameData* frame
 	scissor.extent.height = drawExtent.height;
 
 	vkCmdBeginRendering(*commandBuffer, &renderInfo);
+	std::cout << drawObjectCollection.opaqueObjects.size() << " " << drawObjectCollection.transparentObjects.size() << "\n";
+	auto draw = [&](DrawObjectInfo* draw) {
 
-	auto draw = [&](const DrawObjectInfo& draw) {
-		vkCmdBindPipeline(*commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->pipeline);
-		vkCmdBindDescriptorSets(*commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->pipelineLayout, 0, 1, &sceneDataDescriptor, 0, nullptr);
-		vkCmdBindDescriptorSets(*commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, draw.material->pipeline->pipelineLayout, 1, 1, &draw.material->materialDescriptors, 0, nullptr);
+		std::cout << (draw->material.get()->pipeline->pipeline) << "\n";
+		vkCmdBindPipeline(*commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, draw->material->pipeline->pipeline);
+		vkCmdBindDescriptorSets(*commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, draw->material->pipeline->pipelineLayout, 0, 1, &sceneDataDescriptor, 0, nullptr);
+		vkCmdBindDescriptorSets(*commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, draw->material->pipeline->pipelineLayout, 1, 1, &draw->material->materialDescriptors, 0, nullptr);
 
 		vkCmdSetViewport(*commandBuffer, 0, 1, &viewport);
 		vkCmdSetScissor(*commandBuffer, 0, 1, &scissor);
 
-		vkCmdBindIndexBuffer(*commandBuffer, draw.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdBindIndexBuffer(*commandBuffer, draw->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
 		DrawPushConstants pushConstants;
-		pushConstants.vertexBuffer = draw.vertexBufferAddress;
-		pushConstants.worldMatrix = draw.transform;
-		vkCmdPushConstants(*commandBuffer, draw.material->pipeline->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(DrawPushConstants), &pushConstants);
+		pushConstants.vertexBuffer = draw->vertexBufferAddress;
+		pushConstants.worldMatrix = draw->transform;
+		vkCmdPushConstants(*commandBuffer, draw->material->pipeline->pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(DrawPushConstants), &pushConstants);
 
-		vkCmdDrawIndexed(*commandBuffer, draw.indexCount, 1, draw.firstIndex, 0, 0);
+		vkCmdDrawIndexed(*commandBuffer, draw->indexCount, 1, draw->firstIndex, 0, 0);
 		};
 
-	for (auto& r : drawObjectCollection.opaqueObjects) {
-		draw(r);
+	for (int i = 0; i < drawObjectCollection.opaqueObjects.size(); i++) {
+		draw(drawObjectCollection.opaqueObjects[i]);
 	}
 
-	for (auto& r : drawObjectCollection.transparentObjects) {
-		draw(r);
+	for (int i = 0; i < drawObjectCollection.transparentObjects.size(); i++) {
+		draw(drawObjectCollection.transparentObjects[i]);
 	}
 
 
@@ -334,7 +337,8 @@ void VulkanEngine::drawGeometry(VkCommandBuffer* commandBuffer, FrameData* frame
 void VulkanEngine::destroy() {
 	vkDeviceWaitIdle(vulkanDevice.logicalDevice);
 
-	for (VulkanGLTFModel model : models) { model.destroy(&vulkanDevice); }
+	for (std::shared_ptr<VulkanGLTFModel> model : models) { model.get()->destroy(&vulkanDevice); }
+	models.clear();
 	for (FrameData frame : framesData) { frame.destroy(&vulkanDevice); }
 
 	drawImage.destroy(&vulkanDevice);
@@ -536,6 +540,7 @@ void VulkanEngine::initDescriptors() {
 
 void VulkanEngine::initData() {
 	VulkanGLTFModel model;
-	model.init(&vulkanDevice, "../../assets/structure.glb", materialWriter);
-	models.push_back(model);
+	model.init(&vulkanDevice, "../../assets/structure.glb", &materialWriter);
+	models.push_back(std::make_shared<VulkanGLTFModel>(model));
+
 }

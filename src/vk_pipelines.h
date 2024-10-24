@@ -16,6 +16,7 @@ struct PipelineInfo {
     VkFrontFace frontFace;
     BlendState blending;
     VkFormat colourAttachmentFormat;
+    bool doDepthTest = true;
     VkFormat depthFormat;
     bool depthWriteEnable;
     VkCompareOp depthCompareOperation;

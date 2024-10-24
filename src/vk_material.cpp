@@ -2,6 +2,7 @@
 
 
 void MetallicRoughnessMaterialWriter::buildPipelines(VulkanDevice* device, VkFormat drawFormat, VkFormat depthFormat, VkDescriptorSetLayout sceneDescriptorLayout){
+
 	VkPushConstantRange matrixRange{};
 	matrixRange.offset = 0;
 	matrixRange.size = sizeof(DrawPushConstants);
@@ -24,13 +25,12 @@ void MetallicRoughnessMaterialWriter::buildPipelines(VulkanDevice* device, VkFor
 	materialPipelineLayoutInfo.pushConstantRangeCount = 1;
 
 	pipelines.init(device, drawFormat, depthFormat, materialPipelineLayoutInfo);
-
 }
 
 
 MetallicMaterialInstance MetallicRoughnessMaterialWriter::writeMaterialInstance(VulkanDevice* device, MaterialPassType pass, const MetallicMaterialResources& resources, DescriptorAllocatorGrowable& descriptorAllocator)
 {
-	MetallicMaterialInstance matData;
+	MetallicMaterialInstance matData = {};
 	matData.pass = pass;
 	if (pass == MaterialPassType::Transparent) {
 		matData.pipeline = &pipelines.transparentPipeline;

@@ -45,7 +45,7 @@ VkSamplerAddressMode getVkWrapMode(int32_t wrapMode)
 	return VK_SAMPLER_ADDRESS_MODE_REPEAT;
 }
 
-void VulkanGLTFModel::init(VulkanDevice* device, std::string filename, MetallicRoughnessMaterialWriter writer) {
+void VulkanGLTFModel::init(VulkanDevice* device, std::string filename, MetallicRoughnessMaterialWriter* writer) {
 	tinygltf::Model glTFInput;
 	tinygltf::TinyGLTF gltfContext;
 	std::string error, warning;
@@ -80,6 +80,7 @@ void VulkanGLTFModel::init(VulkanDevice* device, std::string filename, MetallicR
 
 	std::vector<uint32_t> indices;
 	std::vector<Vertex> vertices;
+	meshBuffers = {};
 
 	if (fileLoaded) {
 		loadImages(device, glTFInput);
@@ -238,7 +239,7 @@ void VulkanGLTFModel::loadTextures(VulkanDevice* device, tinygltf::Model& input)
 	}
 }
 
-void VulkanGLTFModel::loadMaterials(VulkanDevice* device, tinygltf::Model& input, MetallicRoughnessMaterialWriter writer)
+void VulkanGLTFModel::loadMaterials(VulkanDevice* device, tinygltf::Model& input, MetallicRoughnessMaterialWriter* writer)
 {
 	materialInstances.resize(input.materials.size());
 
@@ -293,24 +294,24 @@ void VulkanGLTFModel::loadMaterials(VulkanDevice* device, tinygltf::Model& input
 		if (material.alphaMode == "BLEND") {
 			passType = MaterialPassType::Transparent;
 		}
-			materialInstances[i] = writer.writeMaterialInstance(device, passType, materialResources, descriptorPool);
-
-			data_index++;
+			
+		materialInstances[i] = std::make_shared<MaterialInstance>(writer->writeMaterialInstance(device, passType, materialResources, descriptorPool));
+		data_index++;
 	}
 
-	MetallicMaterialResources materialResources;
+	MetallicMaterialResources defaultMaterialResources = {};
 	// default the material textures
-	materialResources.baseColourImage = defaultImage;
-	materialResources.baseColourSampler = defaultSampler;
-	materialResources.metallicRoughnessImage = defaultImage;
-	materialResources.metallicRoughnessSampler = defaultSampler;
+	defaultMaterialResources.baseColourImage = defaultImage;
+	defaultMaterialResources.baseColourSampler = defaultSampler;
+	defaultMaterialResources.metallicRoughnessImage = defaultImage;
+	defaultMaterialResources.metallicRoughnessSampler = defaultSampler;
 
 	// set the uniform buffer for the material data
-	materialResources.dataBuffer = materialDataBuffer.buffer;
-	materialResources.dataBufferOffset = data_index * sizeof(MetallicMaterialConstants);
-	MetallicMaterialConstants constants = { .baseColorFactors = glm::vec4{ 1,1,1,1 } , .metallicRoughnessFactors = glm::vec4{ 1,0.5,0,0 } };
-	sceneMaterialConstants[data_index] = constants;
-	defaultMaterialInstance = writer.writeMaterialInstance(device, MaterialPassType::MainColour, materialResources, descriptorPool);
+	defaultMaterialResources.dataBuffer = materialDataBuffer.buffer;
+	defaultMaterialResources.dataBufferOffset = data_index * sizeof(MetallicMaterialConstants);
+	MetallicMaterialConstants defaultConstants = { .baseColorFactors = glm::vec4{ 1,1,1,1 } , .metallicRoughnessFactors = glm::vec4{ 1,0.5,0,0 } };
+	sceneMaterialConstants[data_index] = defaultConstants;
+	defaultMaterialInstance = std::make_shared<MaterialInstance>(writer->writeMaterialInstance(device, MaterialPassType::MainColour, defaultMaterialResources, descriptorPool));
 	
 }
 
@@ -319,6 +320,7 @@ void VulkanGLTFModel::loadNode(const tinygltf::Node& inputNode, const tinygltf::
 	std::shared_ptr<Node> node;
 	if (inputNode.mesh > -1) { 
 		node = std::make_shared<MeshNode>();
+		static_cast<MeshNode*>(node.get())->meshBuffers = &meshBuffers;
 	}
 	else {
 		node = std::make_shared<Node>();
@@ -353,6 +355,7 @@ void VulkanGLTFModel::loadNode(const tinygltf::Node& inputNode, const tinygltf::
 	if (inputNode.mesh > -1) {
 		const tinygltf::Mesh mesh = input.meshes[inputNode.mesh];
 		// Iterate through all primitives of this node's mesh
+		Mesh nodeMesh = {};
 		for (size_t i = 0; i < mesh.primitives.size(); i++) {
 			const tinygltf::Primitive& glTFPrimitive = mesh.primitives[i];
 			uint32_t firstIndex = static_cast<uint32_t>(indices.size());
@@ -437,13 +440,19 @@ void VulkanGLTFModel::loadNode(const tinygltf::Node& inputNode, const tinygltf::
 			Primitive primitive{};
 			primitive.firstIndex = firstIndex;
 			primitive.indexCount = indexCount;
-			primitive.materialIndex = glTFPrimitive.material;
+			if (glTFPrimitive.material == -1) {
+				primitive.materialInstance = defaultMaterialInstance;
+			}
+			else {
+				primitive.materialInstance = materialInstances[glTFPrimitive.material];
+			}
 
-			static_cast<MeshNode*>(node.get())->mesh.primitives.push_back(primitive);
+			nodeMesh.primitives.push_back(primitive);
 		}
+		static_cast<MeshNode*>(node.get())->mesh = nodeMesh;
 	}
 
-	if (parent.get()) {
+	if (parent.get() != nullptr) {
 		parent->children.push_back(node);
 	}
 	else {
@@ -452,10 +461,10 @@ void VulkanGLTFModel::loadNode(const tinygltf::Node& inputNode, const tinygltf::
 }
 
 
-void VulkanGLTFModel::addNodeDraws(glm::mat4& topMatrix, DrawObjectCollection& collection)
+void VulkanGLTFModel::addNodeDraws(glm::mat4& topMatrix, DrawObjectCollection* collection)
 {
 	for (std::shared_ptr<Node> node : topNodes) {
-		node.get()->appendDraw(this, topMatrix, collection);
+		node.get()->appendDraw(topMatrix, collection);
 	}
 }
 
@@ -474,26 +483,26 @@ void VulkanGLTFModel::destroy(VulkanDevice* device) {
 }
 
 
-void MeshNode::appendDraw(VulkanGLTFModel* model, const glm::mat4& topMatrix, DrawObjectCollection& collection) {
+void MeshNode::appendDraw(const glm::mat4& topMatrix, DrawObjectCollection* collection) {
 	glm::mat4 nodeMatrix = topMatrix * worldTransform;
 
 	for (auto& s : mesh.primitives) {
 		DrawObjectInfo def;
 		def.indexCount = s.indexCount;
 		def.firstIndex = s.firstIndex;
-		def.indexBuffer = model->meshBuffers.indexBuffer.buffer;
-		if (s.materialIndex == -1) {
-			def.material = &model->defaultMaterialInstance;
+		def.indexBuffer = meshBuffers->indexBuffer.buffer;
+		def.material = s.materialInstance;
+
+		def.transform = nodeMatrix;
+		def.vertexBufferAddress = meshBuffers->vertexBufferAddress;
+		if (def.material->pass == MaterialPassType::Transparent) {
+			collection->transparentObjects.push_back(&def);
 		}
 		else {
-			def.material = &model->materialInstances[s.materialIndex]; //issue m index -1
+			collection->opaqueObjects.push_back(&def);
 		}
-		def.transform = nodeMatrix;
-		def.vertexBufferAddress = model->meshBuffers.vertexBufferAddress;
-
-		collection.opaqueObjects.push_back(def);
 	}
 
 	// recurse down
-	Node::appendDraw(model, topMatrix, collection);
+	Node::appendDraw(topMatrix, collection);
 }

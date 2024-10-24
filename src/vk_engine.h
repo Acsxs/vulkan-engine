@@ -55,11 +55,9 @@ public:
 	
 	AllocatedImage depthImage;
 
-	VulkanPipeline defaultPipeline;
-
 	MetallicRoughnessMaterialWriter materialWriter;
 
-	std::vector<VulkanGLTFModel> models;
+	std::vector<std::shared_ptr<VulkanGLTFModel>> models;
 
 	SceneData sceneData;
 	AllocatedBuffer sceneDataBuffer;

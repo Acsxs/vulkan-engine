@@ -57,13 +57,13 @@ struct DrawObjectInfo {
     VkDeviceAddress vertexBufferAddress;
     glm::mat4 transform;
 
-    MaterialInstance* material;
+    std::shared_ptr<MaterialInstance> material;
 };
 
 
 struct DrawObjectCollection {
-    std::vector<DrawObjectInfo> opaqueObjects;
-    std::vector<DrawObjectInfo> transparentObjects;
+    std::vector<DrawObjectInfo*> opaqueObjects;
+    std::vector<DrawObjectInfo*> transparentObjects;
 };
 
 
